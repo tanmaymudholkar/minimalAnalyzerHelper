@@ -348,9 +348,13 @@ int main(int argc, char* argv[]) {
 
   std::cout << "Now beginning to calculate step-by-step efficiencies..." << std::endl;
   std::vector<std::vector<std::string> > stepByStepSequences = {
-    {"hOverE", "sigmaIEtaIEta", "neutIso", "phoIso", "chIso"},
+    {"chIso", "hOverE", "sigmaIEtaIEta", "neutIso", "phoIso"},
+    {"hOverE", "chIso", "sigmaIEtaIEta", "neutIso", "phoIso"},
+    {"hOverE", "sigmaIEtaIEta", "chIso", "neutIso", "phoIso"},
     {"hOverE", "sigmaIEtaIEta", "neutIso", "chIso", "phoIso"},
-    {"chIso", "hOverE", "sigmaIEtaIEta", "neutIso", "phoIso"}
+    {"hOverE", "sigmaIEtaIEta", "neutIso", "phoIso", "chIso"},
+    {"chIso", "phoIso", "hOverE", "sigmaIEtaIEta", "neutIso"},
+    {"phoIso", "chIso", "hOverE", "sigmaIEtaIEta", "neutIso"}
   };
   std::map<unsigned int, std::map<unsigned int, float> > stepByStepEfficiencies_hgg = getStepByStepEfficienciesFromFile(inputFileName_hgg, photonIDCriteria, criteriaCuts, stepByStepSequences, "hgg");
   std::map<unsigned int, std::map<unsigned int, float> > stepByStepEfficiencies_stealth = getStepByStepEfficienciesFromFile(inputFileName_stealth, photonIDCriteria, criteriaCuts, stepByStepSequences, "stealth");
