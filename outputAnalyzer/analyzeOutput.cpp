@@ -428,7 +428,7 @@ int main(int argc, char* argv[]) {
   std::map<std::string, std::map<IDEfficiencyType, float> > efficiencies_hgg = getIDEfficienciesFromFile(inputFileName_hgg, criteriaCuts, "hgg");
   std::map<std::string, std::map<IDEfficiencyType, float> > efficiencies_stealth = getIDEfficienciesFromFile(inputFileName_stealth, criteriaCuts, "stealth");
   std::cout << "Efficiencies in hgg and stealth:" << std::endl;
-  std::cout << "\\begin{tabular}{|p{0.2\\textwidth}||p{0.135\\textwidth}|p{0.135\\textwidth}||p{0.135\\textwidth}|p{0.135\\textwidth}|}" << std::endl;
+  std::cout << "\\begin{tabular}{|p{0.2\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}|}" << std::endl;
   std::cout << "\\hline" << std::endl;
   std::cout << "Criterion & (N-1) efficiency (hgg) & global efficiency (hgg) & (N-1) efficiency (stealth) & global efficiency (stealth)\\\\ \\hline \\hline" << std::endl;
   for (unsigned int criterionIndex = 0; criterionIndex < photonIDCriteria.size(); ++criterionIndex) {
@@ -482,48 +482,27 @@ int main(int argc, char* argv[]) {
   std::map<unsigned int, std::map<unsigned int, float> > stepByStepEfficiencies_hgg = getStepByStepEfficienciesFromFile(inputFileName_hgg, photonIDCriteria, criteriaCuts, stepByStepSequences, "hgg");
   std::map<unsigned int, std::map<unsigned int, float> > stepByStepEfficiencies_stealth = getStepByStepEfficienciesFromFile(inputFileName_stealth, photonIDCriteria, criteriaCuts, stepByStepSequences, "stealth");
   for (unsigned int sequenceIndex = 0; sequenceIndex < stepByStepSequences.size(); ++sequenceIndex) {
-    std::cout << "Observed: " << std::endl;
-    std::cout << "\\begin{tabular}{|p{0.3\\textwidth}||p{0.2\\textwidth}|p{0.2\\textwidth}|}" << std::endl;
+    std::cout << "\\begin{tabular}{|p{0.275\\textwidth}||p{0.13\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.13\\textwidth}||p{0.13\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.13\\textwidth}|}" << std::endl;
     std::cout << "\\hline" << std::endl;
-    std::cout << "\\multicolumn{3}{|c|}{Sequence: ";
+    std::cout << "\\multicolumn{5}{|c|}{Sequence: ";
     const std::vector<std::string>& sequence = stepByStepSequences.at(sequenceIndex);
     for (unsigned int stepIndex = 0; stepIndex < sequence.size(); ++stepIndex) {
       std::cout << sequence.at(stepIndex);
       if (stepIndex < (sequence.size()-1)) std::cout << " $\\rightarrow$ ";
     }
     std::cout << "}\\\\ \\hline \\hline" << std::endl;
-    std::cout << "Step & efficiency(hgg) & efficiency(stealth) \\\\ \\hline \\hline" << std::endl;
+    std::cout << "Step & observed efficiency (hgg) & predicted efficiency (hgg) & observed efficiency (stealth) & predicted efficiency (stealth) \\\\ \\hline \\hline" << std::endl;
     float overallEfficiency_hgg = 1.;
     float overallEfficiency_stealth = 1.;
-    for (unsigned int stepIndex = 0; stepIndex < photonIDCriteria.size(); ++stepIndex) {
-      unsigned int stepNumber = stepIndex + 1;
-      const std::string& criterion = sequence.at(stepIndex);
-      std::cout << stepNumber << " (" << criterion << ") & " << std::setprecision(3) << stepByStepEfficiencies_hgg[sequenceIndex][stepIndex] << " & " << stepByStepEfficiencies_stealth[sequenceIndex][stepIndex] << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
-      overallEfficiency_hgg *= stepByStepEfficiencies_hgg[sequenceIndex][stepIndex];
-      overallEfficiency_stealth *= stepByStepEfficiencies_stealth[sequenceIndex][stepIndex];
-    }
-    std::cout << "\\hline" << std::endl;
-    std::cout << "Overall & " << std::setprecision(3) << overallEfficiency_hgg << " & " << overallEfficiency_stealth << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
-    std::cout << "\\end{tabular}" << std::endl;
-    std::cout << std::endl << std::endl;
-
-    std::cout << "Predicted: " << std::endl;
-    std::cout << "\\begin{tabular}{|p{0.3\\textwidth}||p{0.2\\textwidth}|p{0.2\\textwidth}|}" << std::endl;
-    std::cout << "\\hline" << std::endl;
-    std::cout << "\\multicolumn{3}{|c|}{Sequence: ";
-    std::string headCriterion = sequence.at(0);
-    unsigned int headCriterionIndex = photonIDCriterionIndices.at(headCriterion);
-    for (unsigned int stepIndex = 0; stepIndex < sequence.size(); ++stepIndex) {
-      std::cout << sequence.at(stepIndex);
-      if (stepIndex < (sequence.size()-1)) std::cout << " $\\rightarrow$ ";
-    }
-    std::cout << "}\\\\ \\hline \\hline" << std::endl;
-    std::cout << "Step & predicted eff (hgg) & predicted eff (stealth) \\\\ \\hline \\hline" << std::endl;
     float predictedOverallEfficiency_hgg = 1.;
     float predictedOverallEfficiency_stealth = 1.;
+    std::string headCriterion = sequence.at(0);
+    unsigned int headCriterionIndex = photonIDCriterionIndices.at(headCriterion);
     for (unsigned int stepIndex = 0; stepIndex < photonIDCriteria.size(); ++stepIndex) {
       unsigned int stepNumber = stepIndex + 1;
       const std::string& criterion = sequence.at(stepIndex);
+      overallEfficiency_hgg *= stepByStepEfficiencies_hgg[sequenceIndex][stepIndex];
+      overallEfficiency_stealth *= stepByStepEfficiencies_stealth[sequenceIndex][stepIndex];
       unsigned int currentCriterionIndex = photonIDCriterionIndices.at(criterion);
       float predictedEfficiency_hgg = -1.;
       float predictedEfficiency_stealth = -1.;
@@ -559,12 +538,12 @@ int main(int argc, char* argv[]) {
         predictedEfficiency_hgg = efficiencies_hgg[criterion][IDEfficiencyType::NMinus1];
         predictedEfficiency_stealth = efficiencies_stealth[criterion][IDEfficiencyType::NMinus1];
       }
-      std::cout << stepNumber << " (" << criterion << ") & " << std::setprecision(3) << stepByStepEfficiencies_hgg[sequenceIndex][stepIndex] << " & " << stepByStepEfficiencies_stealth[sequenceIndex][stepIndex] << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
       predictedOverallEfficiency_hgg *= predictedEfficiency_hgg;
       predictedOverallEfficiency_stealth *= predictedEfficiency_stealth;
+      std::cout << stepNumber << " (" << criterion << ") & " << std::setprecision(3) << stepByStepEfficiencies_hgg[sequenceIndex][stepIndex] << " & " << predictedEfficiency_hgg << " & " << stepByStepEfficiencies_stealth[sequenceIndex][stepIndex] << " & " << predictedEfficiency_stealth << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
     }
     std::cout << "\\hline" << std::endl;
-    std::cout << "Overall & " << std::setprecision(3) << predictedOverallEfficiency_hgg << " & " << predictedOverallEfficiency_stealth << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
+    std::cout << "Overall & " << std::setprecision(3) << overallEfficiency_hgg << " & " << predictedOverallEfficiency_hgg << " & " << overallEfficiency_stealth << " & " << predictedOverallEfficiency_stealth << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
     std::cout << "\\end{tabular}" << std::endl;
     std::cout << std::endl << std::endl;
   }

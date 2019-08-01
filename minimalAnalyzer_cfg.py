@@ -8,7 +8,7 @@ options.register(name="inputType",
                  default="none",
                  mult=VarParsing.multiplicity.singleton,
 		 mytype=VarParsing.varType.string,
-		 info="Input to run on. Currently supported: \"hgg\" or \"stealth\".")
+		 info="Input to run on. Currently supported: \"hgg\" or \"stealth\" or \"stealth2017_t5Wg\" or \"stealth2017_t6Wg\".")
 options.register(name="verbosity",
                  default=0,
 		 mult=VarParsing.multiplicity.singleton,
@@ -18,8 +18,8 @@ options.parseArguments()
 
 if (options.inputType == "none"):
     sys.exit("inputType=" + options.inputType + " should be set")
-if not((options.inputType == "stealth") or (options.inputType == "hgg")):
-    sys.exit("inputType=" + options.inputType + " should be one of \"hgg\" or \"stealth\"")
+if not((options.inputType == "stealth") or (options.inputType == "hgg") or (options.inputType == "stealth2017_t5Wg") or (options.inputType == "stealth2017_t6Wg")):
+    sys.exit("inputType=" + options.inputType + " should be one of \"hgg\" or \"stealth\" or \"stealth2017_t5Wg\" or \"stealth2017_t6Wg\"")
 
 process = cms.Process("MinimalAnalyzer")
 
