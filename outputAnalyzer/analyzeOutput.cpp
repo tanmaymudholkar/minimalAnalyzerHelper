@@ -216,7 +216,6 @@ std::map<correlationType, std::map<std::string, std::map<std::string, float> > >
           gPad->SetLogz();
           gStyle->SetOptStat("ou");
           h_global2DPlot->Draw("colz");
-          // h_mediumFakeCriteria->GetZaxis()->SetRangeUser(1, 1000);
           lines->DrawLine(criteriaCuts.at(criterion1), h_global2DPlot->GetYaxis()->GetXmin(), criteriaCuts.at(criterion1), h_global2DPlot->GetYaxis()->GetXmax());
           lines->DrawLine(h_global2DPlot->GetXaxis()->GetXmin(), criteriaCuts.at(criterion2), h_global2DPlot->GetXaxis()->GetXmax(), criteriaCuts.at(criterion2));
           text->DrawText(0.5*(h_global2DPlot->GetXaxis()->GetXmin() + criteriaCuts.at(criterion1)), 0.5*(h_global2DPlot->GetYaxis()->GetXmin() + criteriaCuts.at(criterion2)), "N1");
@@ -236,7 +235,7 @@ std::map<correlationType, std::map<std::string, std::map<std::string, float> > >
   return correlations;
 }
 
-void getFakeToMediumRatioFromFile(const std::string& inputFileName, const std::string& histogramName, const float& chIso_cutMedium, const float& chIso_cutLoose, const float& sigmaietaieta_cutMedium, const float& sigmaietaieta_cutLoose, const bool& isTruthMatched, const std::string& inputType) {
+void getFakeToMediumRatioFromFile(const std::string& inputFileName, const std::string& histogramName, const float& chIso_cutMedium, const float& chIso_cutLoose, const float& sigmaIEtaIEta_cutMedium, const float& sigmaIEtaIEta_cutLoose, const bool& isTruthMatched, const std::string& inputType) {
   std::cout << "From file: " << inputFileName << std::endl;
   float nMedium = 0;
   float nFake = 0;
@@ -248,13 +247,13 @@ void getFakeToMediumRatioFromFile(const std::string& inputFileName, const std::s
     // std::pair<double, double> ratioAndError = getRatioFromTH1(chIso, 1.141, 6.0);
     // std::cout << "Ratio = " << ratioAndError.first << " +/- " << ratioAndError.second << std::endl;
     for (int xbincounter = 0; xbincounter <= 1+h_mediumFakeCriteria->GetXaxis()->GetNbins(); ++xbincounter) {
-      float bin_chIso = h_mediumFakeCriteria->GetXaxis()->GetBinCenter(xbincounter);
+      float bin_sigmaIEtaIEta = h_mediumFakeCriteria->GetXaxis()->GetBinCenter(xbincounter);
       for (int ybincounter = 0; ybincounter <= 1+h_mediumFakeCriteria->GetYaxis()->GetNbins(); ++ybincounter) {
-        float bin_sigmaietaieta = h_mediumFakeCriteria->GetYaxis()->GetBinCenter(ybincounter);
-        if ((bin_chIso < chIso_cutMedium) && (bin_sigmaietaieta < sigmaietaieta_cutMedium)) {
+        float bin_chIso = h_mediumFakeCriteria->GetYaxis()->GetBinCenter(ybincounter);
+        if ((bin_sigmaIEtaIEta < sigmaIEtaIEta_cutMedium) && (bin_chIso < chIso_cutMedium)) {
           nMedium += h_mediumFakeCriteria->GetBinContent(xbincounter, ybincounter);
         }
-        else if ((bin_chIso < chIso_cutLoose) && (bin_sigmaietaieta < sigmaietaieta_cutLoose)) {
+        else if ((bin_sigmaIEtaIEta < sigmaIEtaIEta_cutLoose) && (bin_chIso < chIso_cutLoose)) {
           nFake += h_mediumFakeCriteria->GetBinContent(xbincounter, ybincounter);
         }
       }
@@ -279,16 +278,16 @@ void getFakeToMediumRatioFromFile(const std::string& inputFileName, const std::s
   gStyle->SetOptStat(0);
   h_mediumFakeCriteria->Draw("colz");
   h_mediumFakeCriteria->GetZaxis()->SetRangeUser(1, 1000);
-  lines->DrawLine(chIso_cutMedium, 0., chIso_cutMedium, 0.025);
-  lines->DrawLine(chIso_cutLoose, 0., chIso_cutLoose, 0.025);
-  lines->DrawLine(0., sigmaietaieta_cutMedium, 15., sigmaietaieta_cutMedium);
-  lines->DrawLine(0., sigmaietaieta_cutLoose, 15., sigmaietaieta_cutLoose);
+  lines->DrawLine(sigmaIEtaIEta_cutMedium, h_mediumFakeCriteria->GetYaxis()->GetXmin(), sigmaIEtaIEta_cutMedium, h_mediumFakeCriteria->GetYaxis()->GetXmax());
+  lines->DrawLine(sigmaIEtaIEta_cutLoose, h_mediumFakeCriteria->GetYaxis()->GetXmin(), sigmaIEtaIEta_cutLoose, h_mediumFakeCriteria->GetYaxis()->GetXmax());
+  lines->DrawLine(h_mediumFakeCriteria->GetXaxis()->GetXmin(), chIso_cutMedium, h_mediumFakeCriteria->GetXaxis()->GetXmax(), chIso_cutMedium);
+  lines->DrawLine(h_mediumFakeCriteria->GetXaxis()->GetXmin(), chIso_cutLoose, h_mediumFakeCriteria->GetXaxis()->GetXmax(), chIso_cutLoose);
   text->SetTextColor(kBlue);
-  text->DrawText(0.5*(0.+chIso_cutMedium), 0.5*(0.+sigmaietaieta_cutMedium), "medium");
+  text->DrawText(0.5*(h_mediumFakeCriteria->GetXaxis()->GetXmin() + sigmaIEtaIEta_cutMedium), 0.5*(h_mediumFakeCriteria->GetYaxis()->GetXmin() + chIso_cutMedium), "medium");
   text->SetTextColor(kRed);
-  text->DrawText(0.5*(chIso_cutMedium+chIso_cutLoose), 0.5*(0.+sigmaietaieta_cutMedium), "fake");
-  text->DrawText(0.5*(chIso_cutMedium+chIso_cutLoose), 0.5*(sigmaietaieta_cutMedium+sigmaietaieta_cutLoose), "fake");
-  text->DrawText(0.5*(0.+chIso_cutMedium), 0.5*(sigmaietaieta_cutMedium+sigmaietaieta_cutLoose), "fake");
+  text->DrawText(0.5*(sigmaIEtaIEta_cutMedium+sigmaIEtaIEta_cutLoose), 0.5*(h_mediumFakeCriteria->GetYaxis()->GetXmin() + chIso_cutMedium), "fake");
+  text->DrawText(0.5*(sigmaIEtaIEta_cutMedium+sigmaIEtaIEta_cutLoose), 0.5*(chIso_cutMedium+chIso_cutLoose), "fake");
+  text->DrawText(0.5*(h_mediumFakeCriteria->GetXaxis()->GetXmin()+sigmaIEtaIEta_cutMedium), 0.5*(chIso_cutMedium+chIso_cutLoose), "fake");
   c->SaveAs(outputFileName.c_str());
   inputFile->Close();
 }
@@ -353,8 +352,8 @@ int main(int argc, char* argv[]) {
 
   const float& chIso_cutMedium = 1.141;
   const float& chIso_cutLoose = 6.0;
-  const float& sigmaietaieta_cutMedium = 0.01015;
-  const float& sigmaietaieta_cutLoose = 0.02;
+  const float& sigmaIEtaIEta_cutMedium = 0.01015;
+  const float& sigmaIEtaIEta_cutLoose = 0.02;
 
   std::cout << "Getting ratio of number of photons in fake range to number of photons in good range..." << std::endl;
   std::map<std::string, std::string> inputFiles;
@@ -365,16 +364,16 @@ int main(int argc, char* argv[]) {
   inputFiles["hgg"] = inputFileName_hgg;
   colors["hgg"] = kBlue;
   std::cout << "Without truth matching: " << std::endl;
-  getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaietaieta_cutMedium, sigmaietaieta_cutLoose, false, "hgg");
+  getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, "hgg");
   std::cout << "With truth matching: " << std::endl;
-  getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaietaieta_cutMedium, sigmaietaieta_cutLoose, true, "hgg");
+  getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, true, "hgg");
   std::string inputFileName_stealth = prefix + "stealth" + suffix;
   inputFiles["stealth"] = inputFileName_stealth;
   colors["stealth"] = kRed;
   std::cout << "Without truth matching: " << std::endl;
-  getFakeToMediumRatioFromFile(inputFileName_stealth, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaietaieta_cutMedium, sigmaietaieta_cutLoose, false, "stealth");
+  getFakeToMediumRatioFromFile(inputFileName_stealth, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, "stealth");
   std::cout << "With truth matching: " << std::endl;
-  getFakeToMediumRatioFromFile(inputFileName_stealth, "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaietaieta_cutMedium, sigmaietaieta_cutLoose, true, "stealth");
+  getFakeToMediumRatioFromFile(inputFileName_stealth, "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, true, "stealth");
 
   std::cout << "Now beginning to calculate ID efficiencies..." << std::endl;
   std::vector<std::string> photonIDCriteria = {"hOverE", "sigmaIEtaIEta", "chIso", "neutIso", "phoIso"};
