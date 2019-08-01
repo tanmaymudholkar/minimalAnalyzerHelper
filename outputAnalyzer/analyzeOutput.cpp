@@ -90,7 +90,7 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromF
   inputFile->GetObject("phoET_passingID_TruthMatched", h_phoET_passingID_TruthMatched);
   if (h_phoET_TruthMatched) {
     if (h_phoET_passingID_TruthMatched) {
-      std::string outputFileName = "plots/efficiency/IDEfficiency_overall_" + inputType;
+      std::string outputFileName = "plots/efficiency/IDEfficiencies_overall_check_" + inputType;
       TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
       outputFileName += ".png";
       c->Divide(1, 2);
@@ -339,9 +339,45 @@ void saveEfficiencies(const std::map<std::string, std::string>& inputFiles, cons
         inputFile->Close();
       }
       legend->Draw();
+      gPad->Update();
       c->SaveAs(outputFileName.c_str());
     }
   }
+  std::string outputFileName = "plots/efficiency/IDEfficiencies_overall";
+  TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+  outputFileName += ".png";
+  gPad->SetLogy(0);
+  TLegend *legend = new TLegend(0.6, 0.1, 0.9, 0.3);
+  bool isFirstIteration = true;
+  for (const auto& inputFilesElement: inputFiles) {
+    const std::string& inputType = inputFilesElement.first;
+    const std::string& inputFileName = inputFilesElement.second;
+    TFile *inputFile = TFile::Open(inputFileName.c_str(), "READ");
+    TEfficiency* efficiency;
+    inputFile->GetObject("overallETEfficiency_TruthMatched", efficiency);
+    if (isFirstIteration) {
+      efficiency->Draw();
+      gPad->Update();
+      efficiency->GetPaintedGraph()->SetMinimum(-0.2);
+      efficiency->GetPaintedGraph()->SetMaximum(1.2);
+      gPad->Update();
+      isFirstIteration = false;
+    }
+    else {
+      efficiency->Draw("same");
+      gPad->Update();
+    }
+    efficiency->SetLineColor(colors.at(inputType));
+    efficiency->SetMarkerColor(colors.at(inputType));
+    TLegendEntry* legendEntry = legend->AddEntry(efficiency, inputType.c_str());
+    legendEntry->SetLineColor(colors.at(inputType));
+    legendEntry->SetTextColor(colors.at(inputType));
+    legendEntry->SetMarkerColor(colors.at(inputType));
+    inputFile->Close();
+  }
+  legend->Draw();
+  gPad->Update();
+  c->SaveAs(outputFileName.c_str());
 }
 
 int main(int argc, char* argv[]) {
