@@ -15,6 +15,8 @@
 #include "TFile.h"
 #include "TH1F.h"
 #include "TH2F.h"
+#include "TEfficiency.h"
+#include "TGraphAsymmErrors.h"
 #include "TLine.h"
 #include "TText.h"
 
@@ -79,6 +81,44 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromF
     std::cout << "ERROR: histogram with name \"photonType\" not found!" << std::endl;
     std::exit(EXIT_FAILURE);
   }
+
+  TH1F* h_phoET_TruthMatched;
+  inputFile->GetObject("phoET_TruthMatched", h_phoET_TruthMatched);
+  TH1F* h_phoET_passingID_TruthMatched;
+  inputFile->GetObject("phoET_passingID_TruthMatched", h_phoET_passingID_TruthMatched);
+  if (h_phoET_TruthMatched) {
+    if (h_phoET_passingID_TruthMatched) {
+      std::string outputFileName = "plots/efficiency/IDEfficiency_" + inputType;
+      TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+      outputFileName += ".png";
+      c->Divide(1, 2);
+      c->cd(1);
+      gPad->SetLogy();
+      gStyle->SetOptStat(0);
+      h_phoET_TruthMatched->SetLineColor(kBlue);
+      h_phoET_TruthMatched->Draw();
+      h_phoET_passingID_TruthMatched->SetLineColor(kRed);
+      h_phoET_passingID_TruthMatched->Draw("same");
+      c->cd(2);
+      TEfficiency* net_ID_efficiency = new TEfficiency(*h_phoET_passingID_TruthMatched, *h_phoET_TruthMatched);
+      gPad->SetLogy(0);
+      net_ID_efficiency->Draw();
+      gPad->Update();
+      net_ID_efficiency->GetPaintedGraph()->SetMinimum(-0.2);
+      net_ID_efficiency->GetPaintedGraph()->SetMaximum(1.2);
+      gPad->Update();
+      c->SaveAs(outputFileName.c_str());
+    }
+    else {
+      std::cout << "ERROR: histogram with name \"phoET_passingID_TruthMatched\" not found!" << std::endl;
+      std::exit(EXIT_FAILURE);
+    }
+  }
+  else {
+    std::cout << "ERROR: histogram with name \"phoET_TruthMatched\" not found!" << std::endl;
+    std::exit(EXIT_FAILURE);
+  }
+
   inputFile->Close();
   return IDEfficiencies;
 }
@@ -390,8 +430,6 @@ int main(int argc, char* argv[]) {
     std::cout << "\\multicolumn{3}{|c|}{Sequence: ";
     std::string headCriterion = sequence.at(0);
     unsigned int headCriterionIndex = photonIDCriterionIndices.at(headCriterion);
-    float globalEfficiency_X_hgg = stepByStepEfficiencies_hgg[sequenceIndex][0];
-    float globalEfficiency_X_stealth = stepByStepEfficiencies_stealth[sequenceIndex][0];
     for (unsigned int stepIndex = 0; stepIndex < sequence.size(); ++stepIndex) {
       std::cout << sequence.at(stepIndex);
       if (stepIndex < (sequence.size()-1)) std::cout << " $\\rightarrow$ ";
@@ -403,39 +441,44 @@ int main(int argc, char* argv[]) {
     for (unsigned int stepIndex = 0; stepIndex < photonIDCriteria.size(); ++stepIndex) {
       unsigned int stepNumber = stepIndex + 1;
       const std::string& criterion = sequence.at(stepIndex);
-      unsigned int otherCriterionIndex = photonIDCriterionIndices.at(criterion);
+      unsigned int currentCriterionIndex = photonIDCriterionIndices.at(criterion);
+      float predictedEfficiency_hgg = -1.;
+      float predictedEfficiency_stealth = -1.;
       if (stepIndex == 0) {
-        std::cout << stepNumber << " (" << criterion << ") & " << std::setprecision(3) << stepByStepEfficiencies_hgg[sequenceIndex][stepIndex] << " & " << stepByStepEfficiencies_stealth[sequenceIndex][stepIndex] << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
-        predictedOverallEfficiency_hgg *= stepByStepEfficiencies_hgg[sequenceIndex][stepIndex];
-        predictedOverallEfficiency_stealth *= stepByStepEfficiencies_stealth[sequenceIndex][stepIndex];
+        predictedEfficiency_hgg = efficiencies_hgg[criterion][IDEfficiencyType::global];
+        predictedEfficiency_stealth = efficiencies_stealth[criterion][IDEfficiencyType::global];
       }
-      else {
+      else if (stepIndex <= 3) {
         unsigned int criterionIndex1;
         unsigned int criterionIndex2;
-        float globalEfficiency_Y_hgg = efficiencies_hgg[criterion][IDEfficiencyType::global];
-        float globalEfficiency_Y_stealth = efficiencies_stealth[criterion][IDEfficiencyType::global];
-        float predictedEfficiency_hgg = -1.;
-        float predictedEfficiency_stealth = -1.;
-        if (otherCriterionIndex < headCriterionIndex) {
-          criterionIndex1 = otherCriterionIndex;
+        if (currentCriterionIndex < headCriterionIndex) {
+          criterionIndex1 = currentCriterionIndex;
           criterionIndex2 = headCriterionIndex;
         }
         else {
           criterionIndex1 = headCriterionIndex;
-          criterionIndex2 = otherCriterionIndex;
+          criterionIndex2 = currentCriterionIndex;
         }
-        if (stepIndex <= 2) {
-          predictedEfficiency_hgg = getPredictedStepEfficiency(correlations_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], globalEfficiency_X_hgg, globalEfficiency_Y_hgg);
-          predictedEfficiency_stealth = getPredictedStepEfficiency(correlations_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], globalEfficiency_X_stealth, globalEfficiency_Y_stealth);
+        if (stepIndex == 1) {
+          predictedEfficiency_hgg = getPredictedStepEfficiency(correlations_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_hgg[headCriterion][IDEfficiencyType::global], efficiencies_hgg[criterion][IDEfficiencyType::global]);
+          predictedEfficiency_stealth = getPredictedStepEfficiency(correlations_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_stealth[headCriterion][IDEfficiencyType::global], efficiencies_stealth[criterion][IDEfficiencyType::global]);
         }
-        else {
-          predictedEfficiency_hgg = getPredictedStepEfficiency(correlations_NMinus2_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], globalEfficiency_X_hgg, globalEfficiency_Y_hgg);
-          predictedEfficiency_stealth = getPredictedStepEfficiency(correlations_NMinus2_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], globalEfficiency_X_stealth, globalEfficiency_Y_stealth);
+        else if (stepIndex == 3) {
+          predictedEfficiency_hgg = getPredictedStepEfficiency(correlations_NMinus2_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_hgg[headCriterion][IDEfficiencyType::global], efficiencies_hgg[criterion][IDEfficiencyType::global]);
+          predictedEfficiency_stealth = getPredictedStepEfficiency(correlations_NMinus2_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_stealth[headCriterion][IDEfficiencyType::global], efficiencies_stealth[criterion][IDEfficiencyType::global]);
         }
-        std::cout << stepNumber << " (" << criterion << ") & " << std::setprecision(3) << predictedEfficiency_hgg << " & " << predictedEfficiency_stealth << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
-        predictedOverallEfficiency_hgg *= predictedEfficiency_hgg;
-        predictedOverallEfficiency_stealth *= predictedEfficiency_stealth;
+        else if (stepIndex == 2) {
+          predictedEfficiency_hgg = 0.5*(getPredictedStepEfficiency(correlations_NMinus2_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_hgg[headCriterion][IDEfficiencyType::global], efficiencies_hgg[criterion][IDEfficiencyType::global]) + getPredictedStepEfficiency(correlations_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_hgg[headCriterion][IDEfficiencyType::global], efficiencies_hgg[criterion][IDEfficiencyType::global]));
+          predictedEfficiency_stealth = 0.5*(getPredictedStepEfficiency(correlations_NMinus2_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_stealth[headCriterion][IDEfficiencyType::global], efficiencies_stealth[criterion][IDEfficiencyType::global]) + getPredictedStepEfficiency(correlations_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_stealth[headCriterion][IDEfficiencyType::global], efficiencies_stealth[criterion][IDEfficiencyType::global]));
+        }
       }
+      else {
+        predictedEfficiency_hgg = efficiencies_hgg[criterion][IDEfficiencyType::NMinus1];
+        predictedEfficiency_stealth = efficiencies_stealth[criterion][IDEfficiencyType::NMinus1];
+      }
+      std::cout << stepNumber << " (" << criterion << ") & " << std::setprecision(3) << stepByStepEfficiencies_hgg[sequenceIndex][stepIndex] << " & " << stepByStepEfficiencies_stealth[sequenceIndex][stepIndex] << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
+      predictedOverallEfficiency_hgg *= predictedEfficiency_hgg;
+      predictedOverallEfficiency_stealth *= predictedEfficiency_stealth;
     }
     std::cout << "\\hline" << std::endl;
     std::cout << "Overall & " << std::setprecision(3) << predictedOverallEfficiency_hgg << " & " << predictedOverallEfficiency_stealth << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
