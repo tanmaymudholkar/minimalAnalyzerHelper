@@ -267,7 +267,6 @@ void getFakeToMediumRatioFromFile(const std::string& inputFileName, const std::s
   TLine *lines = new TLine();
   TText *text = new TText();
   text->SetTextAlign(22);
-  text->SetTextAngle(90);
   std::string outputFileName = "plots/NMinus2/mediumFakeCriteria_";
   if (isTruthMatched) outputFileName += "TruthMatched_";
   outputFileName += inputType;
@@ -325,6 +324,7 @@ void saveEfficiencies(const std::map<std::string, std::string>& inputFiles, cons
           efficiency->GetPaintedGraph()->SetMinimum(-0.2);
           efficiency->GetPaintedGraph()->SetMaximum(1.2);
           gPad->Update();
+          isFirstIteration = false;
         }
         else {
           efficiency->Draw("same");
