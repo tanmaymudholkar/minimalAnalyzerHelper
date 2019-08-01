@@ -19,6 +19,8 @@
 #include "TGraphAsymmErrors.h"
 #include "TLine.h"
 #include "TText.h"
+#include "TLegendEntry.h"
+#include "TLegend.h"
 
 enum class IDEfficiencyType{NMinus1_nonTruthMatched=0, NMinus1, global, nIDEfficiencyTypes};
 enum class correlationType{customized=0, pearson, nCorrelationTypes};
@@ -88,7 +90,7 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromF
   inputFile->GetObject("phoET_passingID_TruthMatched", h_phoET_passingID_TruthMatched);
   if (h_phoET_TruthMatched) {
     if (h_phoET_passingID_TruthMatched) {
-      std::string outputFileName = "plots/efficiency/IDEfficiency_" + inputType;
+      std::string outputFileName = "plots/efficiency/IDEfficiency_overall_" + inputType;
       TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
       outputFileName += ".png";
       c->Divide(1, 2);
@@ -303,6 +305,46 @@ float getPredictedStepEfficiency(const float& correlationFactor, const float& gl
   return (1.0/(1.0+quadraticSolution));
 }
 
+void saveEfficiencies(const std::map<std::string, std::string>& inputFiles, const std::vector<std::string>& photonIDCriteria, const std::vector<std::string>& efficiencyTypes, const std::map<std::string, int>& colors) {
+  for (const auto& criterion: photonIDCriteria) {
+    for (const auto& efficiencyType: efficiencyTypes) {
+      std::string outputFileName = "plots/efficiency/IDEfficiencies_" + efficiencyType + "_" + criterion;
+      TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+      outputFileName += ".png";
+      gPad->SetLogy(0);
+      TLegend *legend = new TLegend(0.6, 0.1, 0.9, 0.3);
+      bool isFirstIteration = true;
+      for (const auto& inputFilesElement: inputFiles) {
+        const std::string& inputType = inputFilesElement.first;
+        const std::string& inputFileName = inputFilesElement.second;
+        TFile *inputFile = TFile::Open(inputFileName.c_str(), "READ");
+        TEfficiency* efficiency;
+        inputFile->GetObject((criterion + "_ETEfficiency_" + efficiencyType + "_TruthMatched").c_str(), efficiency);
+        if (isFirstIteration) {
+          efficiency->Draw();
+          gPad->Update();
+          efficiency->GetPaintedGraph()->SetMinimum(-0.2);
+          efficiency->GetPaintedGraph()->SetMaximum(1.2);
+          gPad->Update();
+        }
+        else {
+          efficiency->Draw("same");
+          gPad->Update();
+        }
+        efficiency->SetLineColor(colors.at(inputType));
+        efficiency->SetMarkerColor(colors.at(inputType));
+        TLegendEntry* legendEntry = legend->AddEntry(efficiency, inputType.c_str());
+        legendEntry->SetLineColor(colors.at(inputType));
+        legendEntry->SetTextColor(colors.at(inputType));
+        legendEntry->SetMarkerColor(colors.at(inputType));
+        inputFile->Close();
+      }
+      legend->Draw();
+      c->SaveAs(outputFileName.c_str());
+    }
+  }
+}
+
 int main(int argc, char* argv[]) {
   (void)argc;
   (void)argv;
@@ -315,14 +357,20 @@ int main(int argc, char* argv[]) {
   const float& sigmaietaieta_cutLoose = 0.02;
 
   std::cout << "Getting ratio of number of photons in fake range to number of photons in good range..." << std::endl;
+  std::map<std::string, std::string> inputFiles;
+  std::map<std::string, int> colors;
   std::string prefix = "output_";
   std::string suffix = ".root";
   std::string inputFileName_hgg = prefix + "hgg" + suffix;
+  inputFiles["hgg"] = inputFileName_hgg;
+  colors["hgg"] = kBlue;
   std::cout << "Without truth matching: " << std::endl;
   getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaietaieta_cutMedium, sigmaietaieta_cutLoose, false, "hgg");
   std::cout << "With truth matching: " << std::endl;
   getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaietaieta_cutMedium, sigmaietaieta_cutLoose, true, "hgg");
   std::string inputFileName_stealth = prefix + "stealth" + suffix;
+  inputFiles["stealth"] = inputFileName_stealth;
+  colors["stealth"] = kRed;
   std::cout << "Without truth matching: " << std::endl;
   getFakeToMediumRatioFromFile(inputFileName_stealth, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaietaieta_cutMedium, sigmaietaieta_cutLoose, false, "stealth");
   std::cout << "With truth matching: " << std::endl;
@@ -485,6 +533,11 @@ int main(int argc, char* argv[]) {
     std::cout << "\\end{tabular}" << std::endl;
     std::cout << std::endl << std::endl;
   }
+
+  std::cout << "Now saving ID efficiencies..." << std::endl;
+  std::vector<std::string> efficiencyTypes = {"global", "NMinus1"};
+  saveEfficiencies(inputFiles, photonIDCriteria, efficiencyTypes, colors);
+
   std::cout << "All done!" << std::endl;
   return 0;
 }
