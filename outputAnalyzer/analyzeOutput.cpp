@@ -25,13 +25,16 @@
 enum class IDEfficiencyType{NMinus1_nonTruthMatched=0, NMinus1, global, nIDEfficiencyTypes};
 enum class correlationType{customized=0, pearson, nCorrelationTypes};
 
-float getIDEfficiency(TH1F* inputHist, const float& cut) {
+float getIDEfficiency(TH1F* inputHist, const float& cut, const bool& invertCut) {
   int cutBin = inputHist->GetXaxis()->FindFixBin(cut);
   float binLowEdge = inputHist->GetXaxis()->GetBinLowEdge(cutBin);
   float cutBin_fraction_below = (cut-binLowEdge)/(inputHist->GetXaxis()->GetBinWidth(cutBin));
-  float numerator = cutBin_fraction_below*inputHist->GetBinContent(cutBin) + inputHist->Integral(0, std::max(0, cutBin-1));
-  float denominator = inputHist->Integral(0, 1+inputHist->GetXaxis()->GetNbins());
-  return (numerator/denominator);
+  float cutBin_fraction_above = 1.0-cutBin_fraction_below;
+  float belowCut = cutBin_fraction_below*inputHist->GetBinContent(cutBin) + inputHist->Integral(0, std::max(0, cutBin-1));
+  float aboveCut = cutBin_fraction_above*inputHist->GetBinContent(cutBin) + inputHist->Integral(std::min(1+cutBin, 1+inputHist->GetXaxis()->GetNbins()), 1+inputHist->GetXaxis()->GetNbins());
+  float all = inputHist->Integral(0, 1+inputHist->GetXaxis()->GetNbins());
+  if (invertCut) return (aboveCut/all);
+  return (belowCut/all);
 }
 
 std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromFile(const std::string& inputFileName, const std::map<std::string, float>& criteriaCuts, const std::string& inputType) {
@@ -44,17 +47,17 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromF
     TH1F *h_criterionHist;
     inputFile->GetObject((criterionName+"_NMinus1").c_str(), h_criterionHist);
     h_criterionHist->StatOverflows(kTRUE);
-    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1_nonTruthMatched] = getIDEfficiency(h_criterionHist, cutValue);
+    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1_nonTruthMatched] = getIDEfficiency(h_criterionHist, cutValue, false);
 
     TH1F *h_criterionHist_truthMatched;
     inputFile->GetObject((criterionName+"_NMinus1_TruthMatched").c_str(), h_criterionHist_truthMatched);
     h_criterionHist_truthMatched->StatOverflows(kTRUE);
-    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1] = getIDEfficiency(h_criterionHist_truthMatched, cutValue);
+    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1] = getIDEfficiency(h_criterionHist_truthMatched, cutValue, false);
 
     TH1F *h_criterionHist_global;
     inputFile->GetObject((criterionName+"_global_TruthMatched").c_str(), h_criterionHist_global);
     h_criterionHist_global->StatOverflows(kTRUE);
-    IDEfficiencies[criterionName][IDEfficiencyType::global] = getIDEfficiency(h_criterionHist_global, cutValue);
+    IDEfficiencies[criterionName][IDEfficiencyType::global] = getIDEfficiency(h_criterionHist_global, cutValue, false);
 
     std::string outputFileName = "plots/NMinus1/" + criterionName + "_" + inputType + "_TruthMatched.png";
     TLine *lines = new TLine();
@@ -125,6 +128,59 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromF
   return IDEfficiencies;
 }
 
+std::map<std::string, std::map<IDEfficiencyType, float> > getHLTEfficienciesFromFile(const std::string& inputFileName, const std::map<std::string, float>& criteriaCuts, const std::vector<std::string>& criteriaToInvert, const std::string& inputType) {
+  std::map<std::string, std::map<IDEfficiencyType, float> > IDEfficiencies;
+  TFile *inputFile = TFile::Open(inputFileName.c_str(), "READ");
+  for (auto&& criterionCutPair: criteriaCuts) {
+    auto& criterionName = criterionCutPair.first;
+    auto& cutValue = criterionCutPair.second;
+    bool toInvert;
+    if (std::find(criteriaToInvert.begin(), criteriaToInvert.end(), criterionName) == criteriaToInvert.end()) toInvert = false;
+    else toInvert = true;
+
+    TH1F *h_criterionHist;
+    inputFile->GetObject((criterionName+"_NMinus1_HLT_TruthMatched_").c_str(), h_criterionHist);
+    h_criterionHist->StatOverflows(kTRUE);
+    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1] = getIDEfficiency(h_criterionHist, cutValue, toInvert);
+
+    TH1F *h_criterionHist_global;
+    inputFile->GetObject((criterionName+"_global_HLT_TruthMatched_").c_str(), h_criterionHist_global);
+    h_criterionHist_global->StatOverflows(kTRUE);
+    IDEfficiencies[criterionName][IDEfficiencyType::global] = getIDEfficiency(h_criterionHist_global, cutValue, toInvert);
+
+    std::string outputFileName = "plots/HLT/NMinus1/" + criterionName + "_" + inputType + "_TruthMatched.png";
+    TLine *lines = new TLine();
+    TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+    gPad->SetLogy();
+    gStyle->SetOptStat(110010);
+    h_criterionHist->Draw();
+    lines->DrawLine(cutValue, h_criterionHist->GetMinimum(), cutValue, h_criterionHist->GetMaximum());
+    c->SaveAs(outputFileName.c_str());
+
+    outputFileName = "plots/HLT/global/" + criterionName + "_" + inputType + "_TruthMatched.png";
+    c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+    gPad->SetLogy();
+    gStyle->SetOptStat(110010);
+    h_criterionHist_global->Draw();
+    lines->DrawLine(cutValue, h_criterionHist_global->GetMinimum(), cutValue, h_criterionHist_global->GetMaximum());
+    c->SaveAs(outputFileName.c_str());
+  }
+  inputFile->Close();
+
+  std::string outputFileName = "plots/HLT/overallEfficiency";
+  TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+  outputFileName += ".png";
+  TEfficiency* globalEfficiency;
+  inputFile->GetObject("HLTEfficiency_TruthMatched", globalEfficiency);
+  globalEfficiency->Draw();
+  gPad->Update();
+  globalEfficiency->GetPaintedGraph()->SetMinimum(-0.2);
+  globalEfficiency->GetPaintedGraph()->SetMaximum(1.2);
+  gPad->Update();
+  c->SaveAs(outputFileName.c_str());
+  return IDEfficiencies;
+}
+
 std::map<unsigned int, std::map<unsigned int, float> > getStepByStepEfficienciesFromFile(const std::string& inputFileName, const std::vector<std::string>& photonIDCriteria, const std::map<std::string, float>& criteriaCuts, const std::vector<std::vector<std::string> >& stepByStepSequences, const std::string& inputType) {
   std::map<unsigned int, std::map<unsigned int, float> > IDEfficiencies;
   TFile *inputFile = TFile::Open(inputFileName.c_str(), "READ");
@@ -143,7 +199,7 @@ std::map<unsigned int, std::map<unsigned int, float> > getStepByStepEfficiencies
       inputFile->GetObject(histName.c_str(), h_criterionHist);
       h_criterionHist->StatOverflows(kTRUE);
       assert(std::string(h_criterionHist->GetXaxis()->GetTitle()) == criterion);
-      IDEfficiencies[sequenceIndex][stepIndex] = getIDEfficiency(h_criterionHist, criteriaCuts.at(criterion));
+      IDEfficiencies[sequenceIndex][stepIndex] = getIDEfficiency(h_criterionHist, criteriaCuts.at(criterion), false);
       std::string outputFileName = outputFileNamePrefix + "step" + std::to_string(stepNumber) + "_" + inputType;
       TLine *lines = new TLine();
       TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
@@ -263,7 +319,9 @@ void getFakeToMediumRatioFromFile(const std::string& inputFileName, const std::s
     std::cout << "ERROR: Unable to find histogram named: " << histogramName << std::endl;
     std::exit(EXIT_FAILURE);
   }
-  std::cout << "Ratio loose/medium: " << nFake/nMedium << std::endl;
+  float fakeToMediumRatio = nFake/nMedium;
+  std::cout << "Ratio loose/medium: " << fakeToMediumRatio << std::endl;
+  std::cout << "With this ratio, (leakage into control)/signal: " << fakeToMediumRatio*fakeToMediumRatio + 2*fakeToMediumRatio << std::endl;
   TLine *lines = new TLine();
   TText *text = new TText();
   text->SetTextAlign(22);
@@ -296,7 +354,7 @@ float getPredictedStepEfficiency(const float& correlationFactor, const float& gl
   float gxprime = globalEfficiency_X/(1-globalEfficiency_X);
   float gyprime = globalEfficiency_Y/(1-globalEfficiency_Y);
   float sq_coeff = sprime*gyprime*(1+gxprime);
-  assert(std::fabs(sq_coeff) > 0.001);
+  assert(std::fabs(sq_coeff) > 0.00001);
   float linear_coeff = (gxprime*gyprime) + sprime*(gyprime-gxprime) - 1.0;
   float const_coeff = (-1.0)*(1.0+gxprime);
   float quadraticSolution = (((-1.0*linear_coeff) + std::sqrt((linear_coeff*linear_coeff)+(-4.0*sq_coeff*const_coeff)))/(2.0*sq_coeff));
@@ -315,9 +373,11 @@ void saveEfficiencies(const std::map<std::string, std::string>& inputFiles, cons
       for (const auto& inputFilesElement: inputFiles) {
         const std::string& inputType = inputFilesElement.first;
         const std::string& inputFileName = inputFilesElement.second;
+        std::cout << "Reading from: inputType = " << inputType << ", inputFileName = " << inputFileName << std::endl;
         TFile *inputFile = TFile::Open(inputFileName.c_str(), "READ");
         TEfficiency* efficiency;
         inputFile->GetObject((criterion + "_ETEfficiency_" + efficiencyType + "_TruthMatched").c_str(), efficiency);
+        std::cout << "Name of histo: " << (criterion + "_ETEfficiency_" + efficiencyType + "_TruthMatched") << std::endl;
         if (isFirstIteration) {
           efficiency->Draw();
           gPad->Update();
@@ -403,7 +463,7 @@ int main(int argc, char* argv[]) {
   getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, "hgg");
   std::cout << "With truth matching: " << std::endl;
   getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, true, "hgg");
-  std::string inputFileName_stealth = prefix + "stealth" + suffix;
+  std::string inputFileName_stealth = prefix + "stealth2017_t5Wg" + suffix;
   inputFiles["stealth"] = inputFileName_stealth;
   colors["stealth"] = kRed;
   std::cout << "Without truth matching: " << std::endl;
@@ -436,6 +496,33 @@ int main(int argc, char* argv[]) {
     std::cout << criterion << " & " << std::setprecision(3) << efficiencies_hgg[criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies_hgg[criterion][IDEfficiencyType::global] << " & " << efficiencies_stealth[criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies_stealth[criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
   }
   std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << efficiencies_hgg["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << efficiencies_stealth["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
+  std::cout << "\\end{tabular}" << std::endl;
+
+  std::vector<std::string> diphotonHLTCriteria = {"R9_leading", "hOverE_leading", "sigmaIEtaIEta_leading", "clusIso_leading", "trkIso_leading", "R9_subLeading", "hOverE_subLeading", "sigmaIEtaIEta_subLeading", "clusIso_subLeading", "trkIso_subLeading"};
+  std::map<std::string, float> hltCriteriaCuts = {
+    {"R9_leading", 0.5},
+    {"hOverE_leading", 0.12},
+    {"sigmaIEtaIEta_leading", 0.015},
+    {"clusIso_leading", 1.},
+    {"trkIso_leading", 1.},
+    {"R9_subLeading", 0.5},
+    {"hOverE_subLeading", 0.12},
+    {"sigmaIEtaIEta_subLeading", 0.015},
+    {"clusIso_subLeading", 1.},
+    {"trkIso_subLeading", 1.}
+  };
+  std::vector<std::string> HLTCriteriaToInvert = {"R9_leading", "R9_subLeading"};
+  std::map<std::string, std::map<IDEfficiencyType, float> > hlt_efficiencies_hgg = getHLTEfficienciesFromFile(inputFileName_hgg, hltCriteriaCuts, HLTCriteriaToInvert, "hgg");
+  std::map<std::string, std::map<IDEfficiencyType, float> > hlt_efficiencies_stealth = getHLTEfficienciesFromFile(inputFileName_stealth, hltCriteriaCuts, HLTCriteriaToInvert, "stealth");
+  std::cout << "HLT Efficiencies in hgg and stealth:" << std::endl;
+  std::cout << "\\begin{tabular}{|p{0.2\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}|}" << std::endl;
+  std::cout << "\\hline" << std::endl;
+  std::cout << "Criterion & (N-1) efficiency (hgg) & global efficiency (hgg) & (N-1) efficiency (stealth) & global efficiency (stealth)\\\\ \\hline \\hline" << std::endl;
+  for (unsigned int criterionIndex = 0; criterionIndex < diphotonHLTCriteria.size(); ++criterionIndex) {
+    const std::string& criterion = diphotonHLTCriteria.at(criterionIndex);
+    std::cout << criterion << " & " << std::setprecision(3) << hlt_efficiencies_hgg[criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies_hgg[criterion][IDEfficiencyType::global] << " & " << hlt_efficiencies_stealth[criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies_stealth[criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+  }
+  // std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << hlt_efficiencies_hgg["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << hlt_efficiencies_stealth["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
   std::cout << "\\end{tabular}" << std::endl;
 
   std::cout << "Now beginning to calculate correlations..." << std::endl;
@@ -548,9 +635,9 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl << std::endl;
   }
 
-  std::cout << "Now saving ID efficiencies..." << std::endl;
-  std::vector<std::string> efficiencyTypes = {"global", "NMinus1"};
-  saveEfficiencies(inputFiles, photonIDCriteria, efficiencyTypes, colors);
+  // std::cout << "Now saving ID efficiencies..." << std::endl;
+  // std::vector<std::string> efficiencyTypes = {"global", "NMinus1"};
+  // saveEfficiencies(inputFiles, photonIDCriteria, efficiencyTypes, colors);
 
   std::cout << "All done!" << std::endl;
   return 0;
