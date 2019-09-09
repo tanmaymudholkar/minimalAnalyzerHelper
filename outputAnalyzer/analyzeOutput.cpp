@@ -165,19 +165,19 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getHLTEfficienciesFrom
     lines->DrawLine(cutValue, h_criterionHist_global->GetMinimum(), cutValue, h_criterionHist_global->GetMaximum());
     c->SaveAs(outputFileName.c_str());
   }
-  inputFile->Close();
 
   std::string outputFileName = "plots/HLT/overallEfficiency";
   TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
   outputFileName += ".png";
   TEfficiency* globalEfficiency;
   inputFile->GetObject("HLTEfficiency_TruthMatched", globalEfficiency);
-  globalEfficiency->Draw();
+  globalEfficiency->Draw("colz");
   gPad->Update();
-  globalEfficiency->GetPaintedGraph()->SetMinimum(-0.2);
-  globalEfficiency->GetPaintedGraph()->SetMaximum(1.2);
+  // globalEfficiency->GetPaintedGraph()->SetMinimum(-0.2);
+  // globalEfficiency->GetPaintedGraph()->SetMaximum(1.2);
   gPad->Update();
   c->SaveAs(outputFileName.c_str());
+  inputFile->Close();
   return IDEfficiencies;
 }
 
@@ -452,24 +452,26 @@ int main(int argc, char* argv[]) {
   const float& sigmaIEtaIEta_cutLoose = 0.02;
 
   std::cout << "Getting ratio of number of photons in fake range to number of photons in good range..." << std::endl;
-  std::map<std::string, std::string> inputFiles;
-  std::map<std::string, int> colors;
   std::string prefix = "output_";
   std::string suffix = ".root";
-  std::string inputFileName_hgg = prefix + "hgg" + suffix;
-  inputFiles["hgg"] = inputFileName_hgg;
-  colors["hgg"] = kBlue;
-  std::cout << "Without truth matching: " << std::endl;
-  getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, "hgg");
-  std::cout << "With truth matching: " << std::endl;
-  getFakeToMediumRatioFromFile(inputFileName_hgg, "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, true, "hgg");
-  std::string inputFileName_stealth = prefix + "stealth2017_t5Wg" + suffix;
-  inputFiles["stealth"] = inputFileName_stealth;
-  colors["stealth"] = kRed;
-  std::cout << "Without truth matching: " << std::endl;
-  getFakeToMediumRatioFromFile(inputFileName_stealth, "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, "stealth");
-  std::cout << "With truth matching: " << std::endl;
-  getFakeToMediumRatioFromFile(inputFileName_stealth, "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, true, "stealth");
+  std::vector<std::string> inputTypes = {"fastsim", "fullsim"};
+  assert(inputTypes.size() == 2);
+  std::map<std::string, std::string> inputFileNames = {
+    {"fastsim", "output_stealth_privateMC_fastsim.root"},
+    {"fullsim", "output_stealth_privateMC_fullsim.root"}
+  };
+  assert(inputFileNames.size() == 2);
+  std::map<std::string, int> colors = {
+    {"fastsim", kBlue},
+    {"fullsim", kRed}
+  };
+  assert(colors.size() == 2);
+  for (const auto& inputType: inputTypes) {
+    std::cout << inputType << ": without truth matching: " << std::endl;
+    getFakeToMediumRatioFromFile(inputFileNames[inputType], "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, inputType);
+    std::cout << inputType << ": with truth matching: " << std::endl;
+    getFakeToMediumRatioFromFile(inputFileNames[inputType], "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, true, inputType);
+  }
 
   std::cout << "Now beginning to calculate ID efficiencies..." << std::endl;
   std::vector<std::string> photonIDCriteria = {"hOverE", "sigmaIEtaIEta", "chIso", "neutIso", "phoIso"};
@@ -485,17 +487,20 @@ int main(int argc, char* argv[]) {
     {"neutIso", 1.0},
     {"phoIso", 1.0}
   };
-  std::map<std::string, std::map<IDEfficiencyType, float> > efficiencies_hgg = getIDEfficienciesFromFile(inputFileName_hgg, criteriaCuts, "hgg");
-  std::map<std::string, std::map<IDEfficiencyType, float> > efficiencies_stealth = getIDEfficienciesFromFile(inputFileName_stealth, criteriaCuts, "stealth");
-  std::cout << "Efficiencies in hgg and stealth:" << std::endl;
+
+  std::map<std::string, std::map<std::string, std::map<IDEfficiencyType, float> > > efficiencies;
+  for (const auto& inputType: inputTypes) {
+    efficiencies[inputType] = getIDEfficienciesFromFile(inputFileNames.at(inputType), criteriaCuts, inputType);
+  }
+  std::cout << "Efficiencies in " << inputTypes.at(0) << " and " << inputTypes[1] << ":" << std::endl;
   std::cout << "\\begin{tabular}{|p{0.2\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}|}" << std::endl;
   std::cout << "\\hline" << std::endl;
-  std::cout << "Criterion & (N-1) efficiency (hgg) & global efficiency (hgg) & (N-1) efficiency (stealth) & global efficiency (stealth)\\\\ \\hline \\hline" << std::endl;
+  std::cout << "Criterion & (N-1) efficiency (" << inputTypes.at(0) << ") & global efficiency (" << inputTypes.at(0) << ") & (N-1) efficiency (" << inputTypes.at(1) << ") & global efficiency (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
   for (unsigned int criterionIndex = 0; criterionIndex < photonIDCriteria.size(); ++criterionIndex) {
     const std::string& criterion = photonIDCriteria.at(criterionIndex);
-    std::cout << criterion << " & " << std::setprecision(3) << efficiencies_hgg[criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies_hgg[criterion][IDEfficiencyType::global] << " & " << efficiencies_stealth[criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies_stealth[criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+    std::cout << criterion << " & " << std::setprecision(3) << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::global] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
   }
-  std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << efficiencies_hgg["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << efficiencies_stealth["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
+  std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << efficiencies[inputTypes.at(0)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << efficiencies[inputTypes.at(1)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
   std::cout << "\\end{tabular}" << std::endl;
 
   std::vector<std::string> diphotonHLTCriteria = {"R9_leading", "hOverE_leading", "sigmaIEtaIEta_leading", "clusIso_leading", "trkIso_leading", "R9_subLeading", "hOverE_subLeading", "sigmaIEtaIEta_subLeading", "clusIso_subLeading", "trkIso_subLeading"};
@@ -512,128 +517,146 @@ int main(int argc, char* argv[]) {
     {"trkIso_subLeading", 1.}
   };
   std::vector<std::string> HLTCriteriaToInvert = {"R9_leading", "R9_subLeading"};
-  std::map<std::string, std::map<IDEfficiencyType, float> > hlt_efficiencies_hgg = getHLTEfficienciesFromFile(inputFileName_hgg, hltCriteriaCuts, HLTCriteriaToInvert, "hgg");
-  std::map<std::string, std::map<IDEfficiencyType, float> > hlt_efficiencies_stealth = getHLTEfficienciesFromFile(inputFileName_stealth, hltCriteriaCuts, HLTCriteriaToInvert, "stealth");
-  std::cout << "HLT Efficiencies in hgg and stealth:" << std::endl;
+  std::map<std::string, std::map<std::string, std::map<IDEfficiencyType, float> > > hlt_efficiencies;
+  for (const auto& inputType: inputTypes) {
+    hlt_efficiencies[inputType] = getHLTEfficienciesFromFile(inputFileNames.at(inputType), hltCriteriaCuts, HLTCriteriaToInvert, inputType);
+  }
+  std::cout << "HLT Efficiencies in " << inputTypes.at(0) << " and " << inputTypes.at(1) << ":" << std::endl;
   std::cout << "\\begin{tabular}{|p{0.2\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}|}" << std::endl;
   std::cout << "\\hline" << std::endl;
-  std::cout << "Criterion & (N-1) efficiency (hgg) & global efficiency (hgg) & (N-1) efficiency (stealth) & global efficiency (stealth)\\\\ \\hline \\hline" << std::endl;
+  std::cout << "Criterion & (N-1) efficiency (" << inputTypes.at(0) << ") & global efficiency (" << inputTypes.at(0) << ") & (N-1) efficiency (" << inputTypes.at(1) << ") & global efficiency (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
   for (unsigned int criterionIndex = 0; criterionIndex < diphotonHLTCriteria.size(); ++criterionIndex) {
     const std::string& criterion = diphotonHLTCriteria.at(criterionIndex);
-    std::cout << criterion << " & " << std::setprecision(3) << hlt_efficiencies_hgg[criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies_hgg[criterion][IDEfficiencyType::global] << " & " << hlt_efficiencies_stealth[criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies_stealth[criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+    std::cout << criterion << " & " << std::setprecision(3) << hlt_efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::global] << " & " << hlt_efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
   }
-  // std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << hlt_efficiencies_hgg["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << hlt_efficiencies_stealth["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
+  // std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << hlt_efficiencies[inputTypes.at(0)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << hlt_efficiencies[inputTypes.at(1)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
   std::cout << "\\end{tabular}" << std::endl;
 
   std::cout << "Now beginning to calculate correlations..." << std::endl;
-  std::map<correlationType, std::map<std::string, std::map<std::string, float> > > correlations_hgg = getCorrelationsFromFile(inputFileName_hgg, photonIDCriteria, criteriaCuts, false, "hgg");
-  std::map<correlationType, std::map<std::string, std::map<std::string, float> > > correlations_stealth = getCorrelationsFromFile(inputFileName_stealth, photonIDCriteria, criteriaCuts, false, "stealth");
-  std::map<correlationType, std::map<std::string, std::map<std::string, float> > > correlations_NMinus2_hgg = getCorrelationsFromFile(inputFileName_hgg, photonIDCriteria, criteriaCuts, true, "hgg");
-  std::map<correlationType, std::map<std::string, std::map<std::string, float> > > correlations_NMinus2_stealth = getCorrelationsFromFile(inputFileName_stealth, photonIDCriteria, criteriaCuts, true, "stealth");
-  std::cout << "Correlations in hgg and stealth(customized):" << std::endl;
+  std::map<std::string, std::map<correlationType, std::map<std::string, std::map<std::string, float> > > > correlations;
+  std::map<std::string, std::map<correlationType, std::map<std::string, std::map<std::string, float> > > > correlations_NMinus2;
+  for (const auto& inputType: inputTypes) {
+    correlations[inputType] = getCorrelationsFromFile(inputFileNames.at(inputType), photonIDCriteria, criteriaCuts, false, inputType);
+    correlations_NMinus2[inputType] = getCorrelationsFromFile(inputFileNames.at(inputType), photonIDCriteria, criteriaCuts, true, inputType);
+  }
+
+  std::cout << "Correlations in " << inputTypes.at(0) << " and " << inputTypes.at(1) << " (customized):" << std::endl;
   std::cout << "\\begin{tabular}{|p{0.2\\textwidth}|p{0.2\\textwidth}||p{0.15\\textwidth}|p{0.15\\textwidth}|}" << std::endl;
   std::cout << "\\hline" << std::endl;
-  std::cout << "Criterion1 & Criterion2 & $s$ (hgg) & $s$ (stealth)\\\\ \\hline \\hline" << std::endl;
+  std::cout << "Criterion1 & Criterion2 & $s$ (" << inputTypes.at(0) << ") & $s$ (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
   for (unsigned int criterion1Index = 0; criterion1Index < (-1+photonIDCriteria.size()); ++criterion1Index) {
     const std::string& criterion1 = photonIDCriteria.at(criterion1Index);
     for (unsigned int criterion2Index = (1+criterion1Index); criterion2Index < photonIDCriteria.size(); ++criterion2Index) {
       const std::string& criterion2 = photonIDCriteria.at(criterion2Index);
       // Formatting LaTeX-style
-      std::cout << criterion1 << " & " << criterion2 << " & " << std::setprecision(3) << correlations_hgg[correlationType::customized][criterion1][criterion2] << " & " << correlations_stealth[correlationType::customized][criterion1][criterion2] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+      std::cout << criterion1 << " & " << criterion2 << " & " << std::setprecision(3) << correlations[inputTypes.at(0)][correlationType::customized][criterion1][criterion2] << " & " << correlations[inputTypes.at(1)][correlationType::customized][criterion1][criterion2] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
     }
   }
   std::cout << "\\end{tabular}" << std::endl;
 
-  std::cout << "Correlations in hgg and stealth (Pearson):" << std::endl;
+  std::cout << "Correlations in " << inputTypes.at(0) << " and " << inputTypes.at(1) << " (Pearson):" << std::endl;
   std::cout << "\\hline" << std::endl;
-  std::cout << "Criterion1 & Criterion2 & $s$ (hgg) & $s$ (stealth)\\\\ \\hline \\hline" << std::endl;
+  std::cout << "Criterion1 & Criterion2 & $s$ (" << inputTypes.at(0) << ") & $s$ (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
   for (unsigned int criterion1Index = 0; criterion1Index < (-1+photonIDCriteria.size()); ++criterion1Index) {
     const std::string& criterion1 = photonIDCriteria.at(criterion1Index);
     for (unsigned int criterion2Index = (1+criterion1Index); criterion2Index < photonIDCriteria.size(); ++criterion2Index) {
       const std::string& criterion2 = photonIDCriteria.at(criterion2Index);
       // Formatting LaTeX-style
-      std::cout << criterion1 << " & " << criterion2 << " & " << std::setprecision(3) << correlations_hgg[correlationType::pearson][criterion1][criterion2] << " & " << correlations_stealth[correlationType::pearson][criterion1][criterion2] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+      std::cout << criterion1 << " & " << criterion2 << " & " << std::setprecision(3) << correlations[inputTypes.at(0)][correlationType::pearson][criterion1][criterion2] << " & " << correlations[inputTypes.at(1)][correlationType::pearson][criterion1][criterion2] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
     }
   }
 
-  std::cout << "Now beginning to calculate step-by-step efficiencies..." << std::endl;
-  std::vector<std::vector<std::string> > stepByStepSequences = {
-    {"chIso", "hOverE", "sigmaIEtaIEta", "neutIso", "phoIso"},
-    {"hOverE", "chIso", "sigmaIEtaIEta", "neutIso", "phoIso"},
-    {"hOverE", "sigmaIEtaIEta", "chIso", "neutIso", "phoIso"},
-    {"hOverE", "sigmaIEtaIEta", "neutIso", "chIso", "phoIso"},
-    {"hOverE", "sigmaIEtaIEta", "neutIso", "phoIso", "chIso"},
-    {"chIso", "phoIso", "hOverE", "sigmaIEtaIEta", "neutIso"},
-    {"phoIso", "chIso", "hOverE", "sigmaIEtaIEta", "neutIso"}
-  };
-  std::map<unsigned int, std::map<unsigned int, float> > stepByStepEfficiencies_hgg = getStepByStepEfficienciesFromFile(inputFileName_hgg, photonIDCriteria, criteriaCuts, stepByStepSequences, "hgg");
-  std::map<unsigned int, std::map<unsigned int, float> > stepByStepEfficiencies_stealth = getStepByStepEfficienciesFromFile(inputFileName_stealth, photonIDCriteria, criteriaCuts, stepByStepSequences, "stealth");
-  for (unsigned int sequenceIndex = 0; sequenceIndex < stepByStepSequences.size(); ++sequenceIndex) {
-    std::cout << "\\begin{tabular}{|p{0.275\\textwidth}||p{0.13\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.13\\textwidth}||p{0.13\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.13\\textwidth}|}" << std::endl;
-    std::cout << "\\hline" << std::endl;
-    std::cout << "\\multicolumn{5}{|c|}{Sequence: ";
-    const std::vector<std::string>& sequence = stepByStepSequences.at(sequenceIndex);
-    for (unsigned int stepIndex = 0; stepIndex < sequence.size(); ++stepIndex) {
-      std::cout << sequence.at(stepIndex);
-      if (stepIndex < (sequence.size()-1)) std::cout << " $\\rightarrow$ ";
-    }
-    std::cout << "}\\\\ \\hline \\hline" << std::endl;
-    std::cout << "Step & observed efficiency (hgg) & predicted efficiency (hgg) & observed efficiency (stealth) & predicted efficiency (stealth) \\\\ \\hline \\hline" << std::endl;
-    float overallEfficiency_hgg = 1.;
-    float overallEfficiency_stealth = 1.;
-    float predictedOverallEfficiency_hgg = 1.;
-    float predictedOverallEfficiency_stealth = 1.;
-    std::string headCriterion = sequence.at(0);
-    unsigned int headCriterionIndex = photonIDCriterionIndices.at(headCriterion);
-    for (unsigned int stepIndex = 0; stepIndex < photonIDCriteria.size(); ++stepIndex) {
-      unsigned int stepNumber = stepIndex + 1;
-      const std::string& criterion = sequence.at(stepIndex);
-      overallEfficiency_hgg *= stepByStepEfficiencies_hgg[sequenceIndex][stepIndex];
-      overallEfficiency_stealth *= stepByStepEfficiencies_stealth[sequenceIndex][stepIndex];
-      unsigned int currentCriterionIndex = photonIDCriterionIndices.at(criterion);
-      float predictedEfficiency_hgg = -1.;
-      float predictedEfficiency_stealth = -1.;
-      if (stepIndex == 0) {
-        predictedEfficiency_hgg = efficiencies_hgg[criterion][IDEfficiencyType::global];
-        predictedEfficiency_stealth = efficiencies_stealth[criterion][IDEfficiencyType::global];
-      }
-      else if (stepIndex <= 3) {
-        unsigned int criterionIndex1;
-        unsigned int criterionIndex2;
-        if (currentCriterionIndex < headCriterionIndex) {
-          criterionIndex1 = currentCriterionIndex;
-          criterionIndex2 = headCriterionIndex;
-        }
-        else {
-          criterionIndex1 = headCriterionIndex;
-          criterionIndex2 = currentCriterionIndex;
-        }
-        if (stepIndex == 1) {
-          predictedEfficiency_hgg = getPredictedStepEfficiency(correlations_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_hgg[headCriterion][IDEfficiencyType::global], efficiencies_hgg[criterion][IDEfficiencyType::global]);
-          predictedEfficiency_stealth = getPredictedStepEfficiency(correlations_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_stealth[headCriterion][IDEfficiencyType::global], efficiencies_stealth[criterion][IDEfficiencyType::global]);
-        }
-        else if (stepIndex == 3) {
-          predictedEfficiency_hgg = getPredictedStepEfficiency(correlations_NMinus2_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_hgg[headCriterion][IDEfficiencyType::global], efficiencies_hgg[criterion][IDEfficiencyType::global]);
-          predictedEfficiency_stealth = getPredictedStepEfficiency(correlations_NMinus2_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_stealth[headCriterion][IDEfficiencyType::global], efficiencies_stealth[criterion][IDEfficiencyType::global]);
-        }
-        else if (stepIndex == 2) {
-          predictedEfficiency_hgg = 0.5*(getPredictedStepEfficiency(correlations_NMinus2_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_hgg[headCriterion][IDEfficiencyType::global], efficiencies_hgg[criterion][IDEfficiencyType::global]) + getPredictedStepEfficiency(correlations_hgg[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_hgg[headCriterion][IDEfficiencyType::global], efficiencies_hgg[criterion][IDEfficiencyType::global]));
-          predictedEfficiency_stealth = 0.5*(getPredictedStepEfficiency(correlations_NMinus2_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_stealth[headCriterion][IDEfficiencyType::global], efficiencies_stealth[criterion][IDEfficiencyType::global]) + getPredictedStepEfficiency(correlations_stealth[correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies_stealth[headCriterion][IDEfficiencyType::global], efficiencies_stealth[criterion][IDEfficiencyType::global]));
-        }
-      }
-      else {
-        predictedEfficiency_hgg = efficiencies_hgg[criterion][IDEfficiencyType::NMinus1];
-        predictedEfficiency_stealth = efficiencies_stealth[criterion][IDEfficiencyType::NMinus1];
-      }
-      predictedOverallEfficiency_hgg *= predictedEfficiency_hgg;
-      predictedOverallEfficiency_stealth *= predictedEfficiency_stealth;
-      std::cout << stepNumber << " (" << criterion << ") & " << std::setprecision(3) << stepByStepEfficiencies_hgg[sequenceIndex][stepIndex] << " & " << predictedEfficiency_hgg << " & " << stepByStepEfficiencies_stealth[sequenceIndex][stepIndex] << " & " << predictedEfficiency_stealth << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
-    }
-    std::cout << "\\hline" << std::endl;
-    std::cout << "Overall & " << std::setprecision(3) << overallEfficiency_hgg << " & " << predictedOverallEfficiency_hgg << " & " << overallEfficiency_stealth << " & " << predictedOverallEfficiency_stealth << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
-    std::cout << "\\end{tabular}" << std::endl;
-    std::cout << std::endl << std::endl;
-  }
+  // std::cout << "Now beginning to calculate step-by-step efficiencies..." << std::endl;
+  // std::vector<std::vector<std::string> > stepByStepSequences = {
+  //   {"chIso", "hOverE", "sigmaIEtaIEta", "neutIso", "phoIso"},
+  //   {"hOverE", "chIso", "sigmaIEtaIEta", "neutIso", "phoIso"},
+  //   {"hOverE", "sigmaIEtaIEta", "chIso", "neutIso", "phoIso"},
+  //   {"hOverE", "sigmaIEtaIEta", "neutIso", "chIso", "phoIso"},
+  //   {"hOverE", "sigmaIEtaIEta", "neutIso", "phoIso", "chIso"},
+  //   {"chIso", "phoIso", "hOverE", "sigmaIEtaIEta", "neutIso"},
+  //   {"phoIso", "chIso", "hOverE", "sigmaIEtaIEta", "neutIso"}
+  // };
+  // std::map<std::string, std::map<unsigned int, std::map<unsigned int, float> > > stepByStepEfficiencies;
+  // for (const auto& inputType: inputTypes) {
+  //   stepByStepEfficiencies[inputType] = getStepByStepEfficienciesFromFile(inputFileNames.at(inputType), photonIDCriteria, criteriaCuts, stepByStepSequences, inputType);
+  // }
+  // for (unsigned int sequenceIndex = 0; sequenceIndex < stepByStepSequences.size(); ++sequenceIndex) {
+  //   std::cout << "\\begin{tabular}{|p{0.275\\textwidth}||p{0.13\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.13\\textwidth}||p{0.13\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.13\\textwidth}|}" << std::endl;
+  //   std::cout << "\\hline" << std::endl;
+  //   std::cout << "\\multicolumn{5}{|c|}{Sequence: ";
+  //   const std::vector<std::string>& sequence = stepByStepSequences.at(sequenceIndex);
+  //   for (unsigned int stepIndex = 0; stepIndex < sequence.size(); ++stepIndex) {
+  //     std::cout << sequence.at(stepIndex);
+  //     if (stepIndex < (sequence.size()-1)) std::cout << " $\\rightarrow$ ";
+  //   }
+  //   std::cout << "}\\\\ \\hline \\hline" << std::endl;
+  //   std::cout << "Step & observed efficiency (" << inputTypes.at(0) << ") & predicted efficiency (" << inputTypes.at(0) << ") & observed efficiency (" << inputTypes.at(1) << ") & predicted efficiency (" << inputTypes.at(1) << ") \\\\ \\hline \\hline" << std::endl;
+  //   std::map<std::string, float> overallEfficiencies;
+  //   std::map<std::string, float> predictedOverallEfficiencies;
+  //   for (const auto& inputType: inputTypes) {
+  //     overallEfficiencies[inputType] = 1.;
+  //     predictedOverallEfficiencies[inputType] = 1.;
+  //   }
+  //   std::string headCriterion = sequence.at(0);
+  //   unsigned int headCriterionIndex = photonIDCriterionIndices.at(headCriterion);
+  //   for (unsigned int stepIndex = 0; stepIndex < photonIDCriteria.size(); ++stepIndex) {
+  //     unsigned int stepNumber = stepIndex + 1;
+  //     const std::string& criterion = sequence.at(stepIndex);
+  //     for (const auto& inputType: inputTypes) {
+  // 	overallEfficiencies[inputType] *= stepByStepEfficiencies[inputType][sequenceIndex][stepIndex];
+  //     }
+  //     unsigned int currentCriterionIndex = photonIDCriterionIndices.at(criterion);
+  //     std::map<std::string, float> predictedEfficiencies;
+  //     for (const auto& inputType: inputTypes) {
+  // 	predictedEfficiencies[inputType] = -1.;
+  //     }
+  //     if (stepIndex == 0) {
+  // 	for (const auto& inputType: inputTypes) {
+  // 	  predictedEfficiencies[inputType] = efficiencies[inputType][criterion][IDEfficiencyType::global];
+  // 	}
+  //     }
+  //     else if (stepIndex <= 3) {
+  //       unsigned int criterionIndex1;
+  //       unsigned int criterionIndex2;
+  //       if (currentCriterionIndex < headCriterionIndex) {
+  //         criterionIndex1 = currentCriterionIndex;
+  //         criterionIndex2 = headCriterionIndex;
+  //       }
+  //       else {
+  //         criterionIndex1 = headCriterionIndex;
+  //         criterionIndex2 = currentCriterionIndex;
+  //       }
+  //       if (stepIndex == 1) {
+  // 	  for (const auto& inputType: inputTypes) {
+  // 	    predictedEfficiencies[inputType] = getPredictedStepEfficiency(correlations[inputType][correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies[inputType][headCriterion][IDEfficiencyType::global], efficiencies[inputType][criterion][IDEfficiencyType::global]);
+  // 	  }
+  //       }
+  //       else if (stepIndex == 3) {
+  // 	  for (const auto& inputType: inputTypes) {
+  // 	    predictedEfficiencies[inputType] = getPredictedStepEfficiency(correlations_NMinus2[inputType][correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies[inputType][headCriterion][IDEfficiencyType::global], efficiencies[inputType][criterion][IDEfficiencyType::global]);
+  // 	  }
+  //       }
+  //       else if (stepIndex == 2) {
+  // 	  for (const auto& inputType: inputTypes) {
+  // 	    predictedEfficiencies[inputType] = 0.5*(getPredictedStepEfficiency(correlations_NMinus2[inputType][correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies[inputType][headCriterion][IDEfficiencyType::global], efficiencies[inputType][criterion][IDEfficiencyType::global]) + getPredictedStepEfficiency(correlations[inputType][correlationType::customized][photonIDCriteria.at(criterionIndex1)][photonIDCriteria.at(criterionIndex2)], efficiencies[inputType][headCriterion][IDEfficiencyType::global], efficiencies[inputType][criterion][IDEfficiencyType::global]));
+  // 	  }
+  //       }
+  //     }
+  //     else {
+  // 	for (const auto& inputType: inputTypes) {
+  // 	  predictedEfficiencies[inputType] = efficiencies[inputType][criterion][IDEfficiencyType::NMinus1];
+  // 	}
+  //     }
+  //     for (const auto& inputType: inputTypes) {
+  // 	predictedOverallEfficiencies[inputType] *= predictedEfficiencies.at(inputType);
+  //     }
+  //     std::cout << stepNumber << " (" << criterion << ") & " << std::setprecision(3) << stepByStepEfficiencies[inputTypes.at(0)][sequenceIndex][stepIndex] << " & " << predictedEfficiencies.at(inputTypes.at(0)) << " & " << stepByStepEfficiencies[inputTypes.at(1)][sequenceIndex][stepIndex] << " & " << predictedEfficiencies.at(inputTypes.at(1)) << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
+  //   }
+  //   std::cout << "\\hline" << std::endl;
+  //   std::cout << "Overall & " << std::setprecision(3) << overallEfficiencies.at(inputTypes.at(0)) << " & " << predictedOverallEfficiencies.at(inputTypes.at(0)) << " & " << overallEfficiencies.at(inputTypes.at(1)) << " & " << predictedOverallEfficiencies.at(inputTypes.at(1)) << "\\\\ \\hline" << std::setprecision(original_precision) << std::endl;
+  //   std::cout << "\\end{tabular}" << std::endl;
+  //   std::cout << std::endl << std::endl;
+  // }
 
   // std::cout << "Now saving ID efficiencies..." << std::endl;
   // std::vector<std::string> efficiencyTypes = {"global", "NMinus1"};
