@@ -454,18 +454,20 @@ int main(int argc, char* argv[]) {
   std::cout << "Getting ratio of number of photons in fake range to number of photons in good range..." << std::endl;
   std::string prefix = "output_";
   std::string suffix = ".root";
-  std::vector<std::string> inputTypes = {"fastsim", "fullsim"};
-  assert(inputTypes.size() == 2);
+  std::vector<std::string> inputTypes = {"fastsim_lowMass", "fullsim_lowMass", "hgg"};
+  assert(inputTypes.size() == 3);
   std::map<std::string, std::string> inputFileNames = {
-    {"fastsim", "output_stealth_privateMC_fastsim.root"},
-    {"fullsim", "output_stealth_privateMC_fullsim.root"}
+    {"fastsim_lowMass", "output_stealth_privateMC_fastsim_lowMass.root"},
+    {"fullsim_lowMass", "output_stealth_privateMC_fullsim_lowMass.root"},
+    {"hgg", "output_hgg.root"}
   };
-  assert(inputFileNames.size() == 2);
+  assert(inputFileNames.size() == 3);
   std::map<std::string, int> colors = {
-    {"fastsim", kBlue},
-    {"fullsim", kRed}
+    {"fastsim_lowMass", kBlue},
+    {"fullsim_lowMass", kRed},
+    {"hgg", kGreen}
   };
-  assert(colors.size() == 2);
+  assert(colors.size() == 3);
   for (const auto& inputType: inputTypes) {
     std::cout << inputType << ": without truth matching: " << std::endl;
     getFakeToMediumRatioFromFile(inputFileNames[inputType], "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, inputType);
@@ -492,79 +494,93 @@ int main(int argc, char* argv[]) {
   for (const auto& inputType: inputTypes) {
     efficiencies[inputType] = getIDEfficienciesFromFile(inputFileNames.at(inputType), criteriaCuts, inputType);
   }
-  std::cout << "Efficiencies in " << inputTypes.at(0) << " and " << inputTypes[1] << ":" << std::endl;
-  std::cout << "\\begin{tabular}{|p{0.2\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}|}" << std::endl;
+
+  std::cout << "(N-1) efficiencies in " << inputTypes.at(0) << ", " << inputTypes.at(1) << ", and " << inputTypes.at(2) << ":" << std::endl;
+  std::cout << "\\begin{tabular}{|p{0.25\\textwidth}||p{0.2\\textwidth}|p{0.2\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.2\\textwidth}||}" << std::endl;
   std::cout << "\\hline" << std::endl;
-  std::cout << "Criterion & (N-1) efficiency (" << inputTypes.at(0) << ") & global efficiency (" << inputTypes.at(0) << ") & (N-1) efficiency (" << inputTypes.at(1) << ") & global efficiency (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
+  std::cout << "Criterion & efficiency (" << inputTypes.at(0) << ") & efficiency (" << inputTypes.at(1) << ") & efficiency (" << inputTypes.at(2) << ")\\\\ \\hline \\hline" << std::endl;
   for (unsigned int criterionIndex = 0; criterionIndex < photonIDCriteria.size(); ++criterionIndex) {
     const std::string& criterion = photonIDCriteria.at(criterionIndex);
-    std::cout << criterion << " & " << std::setprecision(3) << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::global] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+    // std::cout << criterion << " & " << std::setprecision(3) << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::global] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+    std::cout << criterion << " & " << std::setprecision(3) << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(2)][criterion][IDEfficiencyType::NMinus1] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
   }
-  std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << efficiencies[inputTypes.at(0)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << efficiencies[inputTypes.at(1)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
+  std::cout << "Overall & " << std::setprecision(3) << efficiencies[inputTypes.at(0)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << " & " << std::setprecision(3) << efficiencies[inputTypes.at(1)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << " & " << std::setprecision(3) << efficiencies[inputTypes.at(2)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
   std::cout << "\\end{tabular}" << std::endl;
 
-  std::vector<std::string> diphotonHLTCriteria = {"R9_leading", "hOverE_leading", "sigmaIEtaIEta_leading", "clusIso_leading", "trkIso_leading", "R9_subLeading", "hOverE_subLeading", "sigmaIEtaIEta_subLeading", "clusIso_subLeading", "trkIso_subLeading"};
-  std::map<std::string, float> hltCriteriaCuts = {
-    {"R9_leading", 0.5},
-    {"hOverE_leading", 0.12},
-    {"sigmaIEtaIEta_leading", 0.015},
-    {"clusIso_leading", 1.},
-    {"trkIso_leading", 1.},
-    {"R9_subLeading", 0.5},
-    {"hOverE_subLeading", 0.12},
-    {"sigmaIEtaIEta_subLeading", 0.015},
-    {"clusIso_subLeading", 1.},
-    {"trkIso_subLeading", 1.}
-  };
-  std::vector<std::string> HLTCriteriaToInvert = {"R9_leading", "R9_subLeading"};
-  std::map<std::string, std::map<std::string, std::map<IDEfficiencyType, float> > > hlt_efficiencies;
-  for (const auto& inputType: inputTypes) {
-    hlt_efficiencies[inputType] = getHLTEfficienciesFromFile(inputFileNames.at(inputType), hltCriteriaCuts, HLTCriteriaToInvert, inputType);
-  }
-  std::cout << "HLT Efficiencies in " << inputTypes.at(0) << " and " << inputTypes.at(1) << ":" << std::endl;
-  std::cout << "\\begin{tabular}{|p{0.2\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}|}" << std::endl;
+  std::cout << "Global efficiencies in " << inputTypes.at(0) << ", " << inputTypes.at(1) << ", and " << inputTypes.at(2) << ":" << std::endl;
+  std::cout << "\\begin{tabular}{|p{0.25\\textwidth}||p{0.2\\textwidth}|p{0.2\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.2\\textwidth}||}" << std::endl;
   std::cout << "\\hline" << std::endl;
-  std::cout << "Criterion & (N-1) efficiency (" << inputTypes.at(0) << ") & global efficiency (" << inputTypes.at(0) << ") & (N-1) efficiency (" << inputTypes.at(1) << ") & global efficiency (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
-  for (unsigned int criterionIndex = 0; criterionIndex < diphotonHLTCriteria.size(); ++criterionIndex) {
-    const std::string& criterion = diphotonHLTCriteria.at(criterionIndex);
-    std::cout << criterion << " & " << std::setprecision(3) << hlt_efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::global] << " & " << hlt_efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+  std::cout << "Criterion & efficiency (" << inputTypes.at(0) << ") & efficiency (" << inputTypes.at(1) << ") & efficiency (" << inputTypes.at(2) << ")\\\\ \\hline \\hline" << std::endl;
+  for (unsigned int criterionIndex = 0; criterionIndex < photonIDCriteria.size(); ++criterionIndex) {
+    const std::string& criterion = photonIDCriteria.at(criterionIndex);
+    // std::cout << criterion << " & " << std::setprecision(3) << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::global] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::NMinus1] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+    std::cout << criterion << " & " << std::setprecision(3) << efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::global] << " & " << efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::global] << " & " << efficiencies[inputTypes.at(2)][criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
   }
-  // std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << hlt_efficiencies[inputTypes.at(0)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << hlt_efficiencies[inputTypes.at(1)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
+  std::cout << "Overall & " << std::setprecision(3) << efficiencies[inputTypes.at(0)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << " & " << std::setprecision(3) << efficiencies[inputTypes.at(1)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << " & " << std::setprecision(3) << efficiencies[inputTypes.at(2)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
   std::cout << "\\end{tabular}" << std::endl;
 
-  std::cout << "Now beginning to calculate correlations..." << std::endl;
-  std::map<std::string, std::map<correlationType, std::map<std::string, std::map<std::string, float> > > > correlations;
-  std::map<std::string, std::map<correlationType, std::map<std::string, std::map<std::string, float> > > > correlations_NMinus2;
-  for (const auto& inputType: inputTypes) {
-    correlations[inputType] = getCorrelationsFromFile(inputFileNames.at(inputType), photonIDCriteria, criteriaCuts, false, inputType);
-    correlations_NMinus2[inputType] = getCorrelationsFromFile(inputFileNames.at(inputType), photonIDCriteria, criteriaCuts, true, inputType);
-  }
+  // std::vector<std::string> diphotonHLTCriteria = {"R9_leading", "hOverE_leading", "sigmaIEtaIEta_leading", "clusIso_leading", "trkIso_leading", "R9_subLeading", "hOverE_subLeading", "sigmaIEtaIEta_subLeading", "clusIso_subLeading", "trkIso_subLeading"};
+  // std::map<std::string, float> hltCriteriaCuts = {
+  //   {"R9_leading", 0.5},
+  //   {"hOverE_leading", 0.12},
+  //   {"sigmaIEtaIEta_leading", 0.015},
+  //   {"clusIso_leading", 1.},
+  //   {"trkIso_leading", 1.},
+  //   {"R9_subLeading", 0.5},
+  //   {"hOverE_subLeading", 0.12},
+  //   {"sigmaIEtaIEta_subLeading", 0.015},
+  //   {"clusIso_subLeading", 1.},
+  //   {"trkIso_subLeading", 1.}
+  // };
+  // std::vector<std::string> HLTCriteriaToInvert = {"R9_leading", "R9_subLeading"};
+  // std::map<std::string, std::map<std::string, std::map<IDEfficiencyType, float> > > hlt_efficiencies;
+  // for (const auto& inputType: inputTypes) {
+  //   hlt_efficiencies[inputType] = getHLTEfficienciesFromFile(inputFileNames.at(inputType), hltCriteriaCuts, HLTCriteriaToInvert, inputType);
+  // }
+  // std::cout << "HLT Efficiencies in " << inputTypes.at(0) << " and " << inputTypes.at(1) << ":" << std::endl;
+  // std::cout << "\\begin{tabular}{|p{0.2\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}||p{0.135\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.135\\textwidth}|}" << std::endl;
+  // std::cout << "\\hline" << std::endl;
+  // std::cout << "Criterion & (N-1) efficiency (" << inputTypes.at(0) << ") & global efficiency (" << inputTypes.at(0) << ") & (N-1) efficiency (" << inputTypes.at(1) << ") & global efficiency (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
+  // for (unsigned int criterionIndex = 0; criterionIndex < diphotonHLTCriteria.size(); ++criterionIndex) {
+  //   const std::string& criterion = diphotonHLTCriteria.at(criterionIndex);
+  //   std::cout << criterion << " & " << std::setprecision(3) << hlt_efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies[inputTypes.at(0)][criterion][IDEfficiencyType::global] << " & " << hlt_efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::NMinus1] << " & " << hlt_efficiencies[inputTypes.at(1)][criterion][IDEfficiencyType::global] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+  // }
+  // // std::cout << "Overall & \\multicolumn{2}{c||}{" << std::setprecision(3) << hlt_efficiencies[inputTypes.at(0)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "} & \\multicolumn{2}{c|}{" << std::setprecision(3) << hlt_efficiencies[inputTypes.at(1)]["overall"][IDEfficiencyType::nIDEfficiencyTypes] << std::setprecision(original_precision) << "}\\\\ \\hline" << std::endl;
+  // std::cout << "\\end{tabular}" << std::endl;
 
-  std::cout << "Correlations in " << inputTypes.at(0) << " and " << inputTypes.at(1) << " (customized):" << std::endl;
-  std::cout << "\\begin{tabular}{|p{0.2\\textwidth}|p{0.2\\textwidth}||p{0.15\\textwidth}|p{0.15\\textwidth}|}" << std::endl;
-  std::cout << "\\hline" << std::endl;
-  std::cout << "Criterion1 & Criterion2 & $s$ (" << inputTypes.at(0) << ") & $s$ (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
-  for (unsigned int criterion1Index = 0; criterion1Index < (-1+photonIDCriteria.size()); ++criterion1Index) {
-    const std::string& criterion1 = photonIDCriteria.at(criterion1Index);
-    for (unsigned int criterion2Index = (1+criterion1Index); criterion2Index < photonIDCriteria.size(); ++criterion2Index) {
-      const std::string& criterion2 = photonIDCriteria.at(criterion2Index);
-      // Formatting LaTeX-style
-      std::cout << criterion1 << " & " << criterion2 << " & " << std::setprecision(3) << correlations[inputTypes.at(0)][correlationType::customized][criterion1][criterion2] << " & " << correlations[inputTypes.at(1)][correlationType::customized][criterion1][criterion2] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
-    }
-  }
-  std::cout << "\\end{tabular}" << std::endl;
+  // std::cout << "Now beginning to calculate correlations..." << std::endl;
+  // std::map<std::string, std::map<correlationType, std::map<std::string, std::map<std::string, float> > > > correlations;
+  // std::map<std::string, std::map<correlationType, std::map<std::string, std::map<std::string, float> > > > correlations_NMinus2;
+  // for (const auto& inputType: inputTypes) {
+  //   correlations[inputType] = getCorrelationsFromFile(inputFileNames.at(inputType), photonIDCriteria, criteriaCuts, false, inputType);
+  //   correlations_NMinus2[inputType] = getCorrelationsFromFile(inputFileNames.at(inputType), photonIDCriteria, criteriaCuts, true, inputType);
+  // }
 
-  std::cout << "Correlations in " << inputTypes.at(0) << " and " << inputTypes.at(1) << " (Pearson):" << std::endl;
-  std::cout << "\\hline" << std::endl;
-  std::cout << "Criterion1 & Criterion2 & $s$ (" << inputTypes.at(0) << ") & $s$ (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
-  for (unsigned int criterion1Index = 0; criterion1Index < (-1+photonIDCriteria.size()); ++criterion1Index) {
-    const std::string& criterion1 = photonIDCriteria.at(criterion1Index);
-    for (unsigned int criterion2Index = (1+criterion1Index); criterion2Index < photonIDCriteria.size(); ++criterion2Index) {
-      const std::string& criterion2 = photonIDCriteria.at(criterion2Index);
-      // Formatting LaTeX-style
-      std::cout << criterion1 << " & " << criterion2 << " & " << std::setprecision(3) << correlations[inputTypes.at(0)][correlationType::pearson][criterion1][criterion2] << " & " << correlations[inputTypes.at(1)][correlationType::pearson][criterion1][criterion2] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
-    }
-  }
+  // std::cout << "Correlations in " << inputTypes.at(0) << " and " << inputTypes.at(1) << " (customized):" << std::endl;
+  // std::cout << "\\begin{tabular}{|p{0.2\\textwidth}|p{0.2\\textwidth}||p{0.15\\textwidth}|p{0.15\\textwidth}|}" << std::endl;
+  // std::cout << "\\hline" << std::endl;
+  // std::cout << "Criterion1 & Criterion2 & $s$ (" << inputTypes.at(0) << ") & $s$ (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
+  // for (unsigned int criterion1Index = 0; criterion1Index < (-1+photonIDCriteria.size()); ++criterion1Index) {
+  //   const std::string& criterion1 = photonIDCriteria.at(criterion1Index);
+  //   for (unsigned int criterion2Index = (1+criterion1Index); criterion2Index < photonIDCriteria.size(); ++criterion2Index) {
+  //     const std::string& criterion2 = photonIDCriteria.at(criterion2Index);
+  //     // Formatting LaTeX-style
+  //     std::cout << criterion1 << " & " << criterion2 << " & " << std::setprecision(3) << correlations[inputTypes.at(0)][correlationType::customized][criterion1][criterion2] << " & " << correlations[inputTypes.at(1)][correlationType::customized][criterion1][criterion2] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+  //   }
+  // }
+  // std::cout << "\\end{tabular}" << std::endl;
+
+  // std::cout << "Correlations in " << inputTypes.at(0) << " and " << inputTypes.at(1) << " (Pearson):" << std::endl;
+  // std::cout << "\\hline" << std::endl;
+  // std::cout << "Criterion1 & Criterion2 & $s$ (" << inputTypes.at(0) << ") & $s$ (" << inputTypes.at(1) << ")\\\\ \\hline \\hline" << std::endl;
+  // for (unsigned int criterion1Index = 0; criterion1Index < (-1+photonIDCriteria.size()); ++criterion1Index) {
+  //   const std::string& criterion1 = photonIDCriteria.at(criterion1Index);
+  //   for (unsigned int criterion2Index = (1+criterion1Index); criterion2Index < photonIDCriteria.size(); ++criterion2Index) {
+  //     const std::string& criterion2 = photonIDCriteria.at(criterion2Index);
+  //     // Formatting LaTeX-style
+  //     std::cout << criterion1 << " & " << criterion2 << " & " << std::setprecision(3) << correlations[inputTypes.at(0)][correlationType::pearson][criterion1][criterion2] << " & " << correlations[inputTypes.at(1)][correlationType::pearson][criterion1][criterion2] << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+  //   }
+  // }
 
   // std::cout << "Now beginning to calculate step-by-step efficiencies..." << std::endl;
   // std::vector<std::vector<std::string> > stepByStepSequences = {
