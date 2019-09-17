@@ -25,7 +25,7 @@
 enum class IDEfficiencyType{NMinus1_nonTruthMatched=0, NMinus1, global, nIDEfficiencyTypes};
 enum class correlationType{customized=0, pearson, nCorrelationTypes};
 
-float getIDEfficiency(TH1F* inputHist, const float& cut, const bool& invertCut) {
+float getCutEfficiency(TH1F* inputHist, const float& cut, const bool& invertCut) {
   int cutBin = inputHist->GetXaxis()->FindFixBin(cut);
   float binLowEdge = inputHist->GetXaxis()->GetBinLowEdge(cutBin);
   float cutBin_fraction_below = (cut-binLowEdge)/(inputHist->GetXaxis()->GetBinWidth(cutBin));
@@ -37,7 +37,77 @@ float getIDEfficiency(TH1F* inputHist, const float& cut, const bool& invertCut) 
   return (belowCut/all);
 }
 
-std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromFile(const std::string& inputFileName, const std::map<std::string, float>& criteriaCuts, const std::string& inputType) {
+TH1F* getCumulativeWithOverflows(TH1F* inputHist, const bool& invertDirection) {
+  std::string inputName = inputHist->GetName();
+  std::string inputTitle = inputHist->GetTitle();
+  TH1F* cumulative = (TH1F*)(inputHist->Clone(("cumulative_" + inputName).c_str()));
+  cumulative->SetTitle(("Cumulative: " + inputTitle).c_str());
+  float runningTotal = 0.;
+  if (invertDirection) {
+    for (int binIndex = (1+inputHist->GetXaxis()->GetNbins()); binIndex >= 0; --binIndex) {
+      runningTotal += inputHist->GetBinContent(binIndex);
+      cumulative->SetBinContent(binIndex, runningTotal);
+      cumulative->SetBinError(binIndex, 0.); // temporary
+    }
+  }
+  else {
+    for (int binIndex = 0; binIndex <= (1+inputHist->GetXaxis()->GetNbins()); ++binIndex) {
+      runningTotal += inputHist->GetBinContent(binIndex);
+      cumulative->SetBinContent(binIndex, runningTotal);
+      cumulative->SetBinError(binIndex, 0.); // temporary
+    }
+  }
+  return cumulative;
+}
+
+float getNthPercentile(TH1F* inputHist, const float& targetPercentileFraction, const bool& invertDirection) { // inefficient implementation
+  TH1F* cumulativeInputHist = getCumulativeWithOverflows(inputHist, invertDirection);
+  int lastBinIndex = invertDirection? 0 : (1+inputHist->GetXaxis()->GetNbins());
+  float sumContents = cumulativeInputHist->GetBinContent(lastBinIndex);
+  int percentileBin = 0;
+  if (invertDirection) {
+    for (int binIndex = (1+inputHist->GetXaxis()->GetNbins()); binIndex >= 0; --binIndex) {
+      // std::cout << "At binIndex = " << binIndex << " (low edge: " << inputHist->GetXaxis()->GetBinLowEdge(binIndex) << ", up edge: " << inputHist->GetXaxis()->GetBinUpEdge(binIndex) << "), percentileFraction: " << cumulativeInputHist->GetBinContent(binIndex)/sumContents << std::endl;
+      if (cumulativeInputHist->GetBinContent(binIndex)/sumContents > targetPercentileFraction) {
+	percentileBin = binIndex;
+	// std::cout << "Breaking loop; percentile bin: "<< percentileBin << std::endl;
+	break;
+      }
+    }
+  }
+  else {
+    for (int binIndex = 0; binIndex <= (1+inputHist->GetXaxis()->GetNbins()); ++binIndex) {
+      // std::cout << "At binIndex = " << binIndex << " (low edge: " << inputHist->GetXaxis()->GetBinLowEdge(binIndex) << ", up edge: " << inputHist->GetXaxis()->GetBinUpEdge(binIndex) << "), percentileFraction: " << cumulativeInputHist->GetBinContent(binIndex)/sumContents << std::endl;
+      if (cumulativeInputHist->GetBinContent(binIndex)/sumContents > targetPercentileFraction) {
+	percentileBin = binIndex;
+	// std::cout << "Breaking loop; percentile bin: "<< percentileBin << std::endl;
+	break;
+      }
+    }
+  }
+  // assert((percentileBin > 1) && (percentileBin < (inputHist->GetXaxis()->GetNbins())));
+  float percentileAbscissa = invertDirection? inputHist->GetXaxis()->GetBinUpEdge(percentileBin): inputHist->GetXaxis()->GetBinLowEdge(percentileBin);
+  // std::cout << "Initial percentileAbscissa: " << percentileAbscissa << std::endl;
+  if (invertDirection) {
+    float fractionAbove = (percentileBin <= inputHist->GetXaxis()->GetNbins()) ? (targetPercentileFraction*sumContents - cumulativeInputHist->GetBinContent(percentileBin+1))/(cumulativeInputHist->GetBinContent(percentileBin) - cumulativeInputHist->GetBinContent(percentileBin+1)) : (targetPercentileFraction*sumContents)/(cumulativeInputHist->GetBinContent(percentileBin));
+    // std::cout << "fractionAbove: " << fractionAbove << std::endl;
+    assert(fractionAbove <= 1.);
+    assert(fractionAbove >= 0.);
+    percentileAbscissa -= fractionAbove*inputHist->GetBinWidth(percentileBin);
+  }
+  else {
+    float fractionBelow = (percentileBin > 0)? (targetPercentileFraction*sumContents - cumulativeInputHist->GetBinContent(percentileBin-1))/(cumulativeInputHist->GetBinContent(percentileBin) - cumulativeInputHist->GetBinContent(percentileBin-1)) : (targetPercentileFraction*sumContents)/(cumulativeInputHist->GetBinContent(percentileBin));
+    // std::cout << "fractionBelow: " << fractionBelow << std::endl;
+    assert(fractionBelow <= 1.);
+    assert(fractionBelow >= 0.);
+    percentileAbscissa += fractionBelow*inputHist->GetBinWidth(percentileBin);
+  }
+  // std::cout << "Final percentileAbscissa: " << percentileAbscissa << std::endl;
+  return percentileAbscissa;
+}
+
+std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, std::map<IDEfficiencyType, float> > > getPercentilesAndIDEfficienciesFromFile(const std::string& inputFileName, const std::vector<int> &requiredPercentiles, const std::map<std::string, float>& criteriaCuts, const std::string& inputType) {
+  std::map<std::string, std::map<int, float> > percentiles;
   std::map<std::string, std::map<IDEfficiencyType, float> > IDEfficiencies;
   TFile *inputFile = TFile::Open(inputFileName.c_str(), "READ");
   for (auto&& criterionCutPair: criteriaCuts) {
@@ -47,33 +117,61 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromF
     TH1F *h_criterionHist;
     inputFile->GetObject((criterionName+"_NMinus1").c_str(), h_criterionHist);
     h_criterionHist->StatOverflows(kTRUE);
-    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1_nonTruthMatched] = getIDEfficiency(h_criterionHist, cutValue, false);
+    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1_nonTruthMatched] = getCutEfficiency(h_criterionHist, cutValue, false);
 
     TH1F *h_criterionHist_truthMatched;
     inputFile->GetObject((criterionName+"_NMinus1_TruthMatched").c_str(), h_criterionHist_truthMatched);
     h_criterionHist_truthMatched->StatOverflows(kTRUE);
-    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1] = getIDEfficiency(h_criterionHist_truthMatched, cutValue, false);
+    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1] = getCutEfficiency(h_criterionHist_truthMatched, cutValue, false);
 
     TH1F *h_criterionHist_global;
     inputFile->GetObject((criterionName+"_global_TruthMatched").c_str(), h_criterionHist_global);
     h_criterionHist_global->StatOverflows(kTRUE);
-    IDEfficiencies[criterionName][IDEfficiencyType::global] = getIDEfficiency(h_criterionHist_global, cutValue, false);
+    IDEfficiencies[criterionName][IDEfficiencyType::global] = getCutEfficiency(h_criterionHist_global, cutValue, false);
 
-    std::string outputFileName = "plots/NMinus1/" + criterionName + "_" + inputType + "_TruthMatched.png";
+    for (const int& requiredPercentile: requiredPercentiles) {
+      // std::cout << "Getting " << requiredPercentile << "'th percentile for: " << criterionName << std::endl;
+      percentiles[criterionName][requiredPercentile] = getNthPercentile(h_criterionHist_global, requiredPercentile/100., false);
+    }
+
+    std::string outputFileName;
     TLine *lines = new TLine();
+    TText *text = new TText();
+    text->SetTextAlign(21);
+    // text->SetTextAngle(90);
+    text->SetTextSize(0.02);
+    float textx = -1.;
+    float texty = -1.;
+
+    outputFileName= "plots/NMinus1/" + criterionName + "_" + inputType + "_TruthMatched";
     TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+    outputFileName += ".png";
     gPad->SetLogy();
     gStyle->SetOptStat(110010);
     h_criterionHist_truthMatched->Draw();
     lines->DrawLine(cutValue, h_criterionHist_truthMatched->GetMinimum(), cutValue, h_criterionHist_truthMatched->GetMaximum());
     c->SaveAs(outputFileName.c_str());
 
-    outputFileName = "plots/global/" + criterionName + "_" + inputType + "_TruthMatched.png";
+    outputFileName = "plots/global/" + criterionName + "_" + inputType + "_TruthMatched";
     c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+    outputFileName += ".png";
     gPad->SetLogy();
     gStyle->SetOptStat(110010);
     h_criterionHist_global->Draw();
-    lines->DrawLine(cutValue, h_criterionHist_global->GetMinimum(), cutValue, h_criterionHist_global->GetMaximum());
+    for (const int& requiredPercentile: requiredPercentiles) {
+      TLine *percentileLine = lines->DrawLine((percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMinimum(), (percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMaximum());
+      percentileLine->SetLineColor(kGreen);
+      text->SetTextColor(kGreen);
+      textx = (percentiles.at(criterionName)).at(requiredPercentile);
+      texty = h_criterionHist_global->GetMaximum();
+      text->DrawText(textx, texty, (std::to_string(requiredPercentile)).c_str());
+    }
+    TLine *cutLine = lines->DrawLine(cutValue, h_criterionHist_global->GetMinimum(), cutValue, h_criterionHist_global->GetMaximum());
+    cutLine->SetLineColor(kRed);
+    text->SetTextColor(kRed);
+    textx = cutValue;
+    texty = h_criterionHist_global->GetMinimum();
+    text->DrawText(textx, texty, "medID");
     c->SaveAs(outputFileName.c_str());
   }
   TH1F *h_photonType;
@@ -125,7 +223,7 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getIDEfficienciesFromF
   }
 
   inputFile->Close();
-  return IDEfficiencies;
+  return std::make_pair(percentiles, IDEfficiencies);
 }
 
 std::map<std::string, std::map<IDEfficiencyType, float> > getHLTEfficienciesFromFile(const std::string& inputFileName, const std::map<std::string, float>& criteriaCuts, const std::vector<std::string>& criteriaToInvert, const std::string& inputType) {
@@ -141,12 +239,12 @@ std::map<std::string, std::map<IDEfficiencyType, float> > getHLTEfficienciesFrom
     TH1F *h_criterionHist;
     inputFile->GetObject((criterionName+"_NMinus1_HLT_TruthMatched_").c_str(), h_criterionHist);
     h_criterionHist->StatOverflows(kTRUE);
-    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1] = getIDEfficiency(h_criterionHist, cutValue, toInvert);
+    IDEfficiencies[criterionName][IDEfficiencyType::NMinus1] = getCutEfficiency(h_criterionHist, cutValue, toInvert);
 
     TH1F *h_criterionHist_global;
     inputFile->GetObject((criterionName+"_global_HLT_TruthMatched_").c_str(), h_criterionHist_global);
     h_criterionHist_global->StatOverflows(kTRUE);
-    IDEfficiencies[criterionName][IDEfficiencyType::global] = getIDEfficiency(h_criterionHist_global, cutValue, toInvert);
+    IDEfficiencies[criterionName][IDEfficiencyType::global] = getCutEfficiency(h_criterionHist_global, cutValue, toInvert);
 
     std::string outputFileName = "plots/HLT/NMinus1/" + criterionName + "_" + inputType + "_TruthMatched.png";
     TLine *lines = new TLine();
@@ -199,7 +297,7 @@ std::map<unsigned int, std::map<unsigned int, float> > getStepByStepEfficiencies
       inputFile->GetObject(histName.c_str(), h_criterionHist);
       h_criterionHist->StatOverflows(kTRUE);
       assert(std::string(h_criterionHist->GetXaxis()->GetTitle()) == criterion);
-      IDEfficiencies[sequenceIndex][stepIndex] = getIDEfficiency(h_criterionHist, criteriaCuts.at(criterion), false);
+      IDEfficiencies[sequenceIndex][stepIndex] = getCutEfficiency(h_criterionHist, criteriaCuts.at(criterion), false);
       std::string outputFileName = outputFileNamePrefix + "step" + std::to_string(stepNumber) + "_" + inputType;
       TLine *lines = new TLine();
       TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
@@ -454,17 +552,17 @@ int main(int argc, char* argv[]) {
   std::cout << "Getting ratio of number of photons in fake range to number of photons in good range..." << std::endl;
   std::string prefix = "output_";
   std::string suffix = ".root";
-  std::vector<std::string> inputTypes = {"fastsim_lowMass", "fullsim_lowMass", "hgg"};
+  std::vector<std::string> inputTypes = {"fastsim", "fullsim", "hgg"};
   assert(inputTypes.size() == 3);
   std::map<std::string, std::string> inputFileNames = {
-    {"fastsim_lowMass", "output_stealth_privateMC_fastsim_lowMass.root"},
-    {"fullsim_lowMass", "output_stealth_privateMC_fullsim_lowMass.root"},
+    {"fastsim", "output_stealth_privateMC_fastsim.root"},
+    {"fullsim", "output_stealth_privateMC_fullsim.root"},
     {"hgg", "output_hgg.root"}
   };
   assert(inputFileNames.size() == 3);
   std::map<std::string, int> colors = {
-    {"fastsim_lowMass", kBlue},
-    {"fullsim_lowMass", kRed},
+    {"fastsim", kBlue},
+    {"fullsim", kRed},
     {"hgg", kGreen}
   };
   assert(colors.size() == 3);
@@ -489,10 +587,24 @@ int main(int argc, char* argv[]) {
     {"neutIso", 1.0},
     {"phoIso", 1.0}
   };
+  std::vector<int> requiredPercentiles = {70, 80, 90, 95};
 
+  std::map<std::string, std::map<std::string, std::map<int, float> > > percentiles;
   std::map<std::string, std::map<std::string, std::map<IDEfficiencyType, float> > > efficiencies;
   for (const auto& inputType: inputTypes) {
-    efficiencies[inputType] = getIDEfficienciesFromFile(inputFileNames.at(inputType), criteriaCuts, inputType);
+    std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, std::map<IDEfficiencyType, float> > > percentilesAndIDEfficiencies = getPercentilesAndIDEfficienciesFromFile(inputFileNames.at(inputType), requiredPercentiles, criteriaCuts, inputType);
+    percentiles[inputType] = percentilesAndIDEfficiencies.first;
+    efficiencies[inputType] = percentilesAndIDEfficiencies.second;
+    std::cout << "Distribution percentiles in " << inputType << ":" << std::endl;
+    std::cout << "\\begin{tabular}{|p{0.25\\textwidth}||p{0.15\\textwidth}|p{0.15\\textwidth}|>{\\columncolor[gray]{0.8}}p{0.15\\textwidth}||p{0.15\\textwidth}||}" << std::endl;
+    assert(requiredPercentiles.size() == 4);
+    std::cout << "\\hline" << std::endl;
+    std::cout << "Criterion & " << requiredPercentiles.at(0) << " & " << requiredPercentiles.at(1) << " & " << requiredPercentiles.at(2) << " & " << requiredPercentiles.at(3) << "\\\\ \\hline \\hline" << std::endl;
+
+    for (const std::string& criterion: photonIDCriteria) {
+      std::cout << criterion << " & " << std::setprecision(3) << ((percentiles.at(inputType)).at(criterion).at(requiredPercentiles.at(0))) << " & " << ((percentiles.at(inputType)).at(criterion).at(requiredPercentiles.at(1))) << " & " << ((percentiles.at(inputType)).at(criterion).at(requiredPercentiles.at(2))) << " & " << ((percentiles.at(inputType)).at(criterion).at(requiredPercentiles.at(3))) << std::setprecision(original_precision) << "\\\\ \\hline" << std::endl;
+    }
+    std::cout << "\\end{tabular}" << std::endl;
   }
 
   std::cout << "(N-1) efficiencies in " << inputTypes.at(0) << ", " << inputTypes.at(1) << ", and " << inputTypes.at(2) << ":" << std::endl;
