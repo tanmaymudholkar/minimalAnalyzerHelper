@@ -135,7 +135,10 @@ std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, st
     }
 
     std::string outputFileName;
+    TCanvas *c;
     TLine *lines = new TLine();
+    TLine *cutLine;
+    TLine *percentileLine;
     TText *text = new TText();
     text->SetTextAlign(21);
     // text->SetTextAngle(90);
@@ -144,12 +147,25 @@ std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, st
     float texty = -1.;
 
     outputFileName= "plots/NMinus1/" + criterionName + "_" + inputType + "_TruthMatched";
-    TCanvas *c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+    c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
     outputFileName += ".png";
     gPad->SetLogy();
     gStyle->SetOptStat(110010);
     h_criterionHist_truthMatched->Draw();
-    lines->DrawLine(cutValue, h_criterionHist_truthMatched->GetMinimum(), cutValue, h_criterionHist_truthMatched->GetMaximum());
+    for (const int& requiredPercentile: requiredPercentiles) {
+      percentileLine = lines->DrawLine((percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMinimum(), (percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMaximum());
+      percentileLine->SetLineColor(kGreen);
+      text->SetTextColor(kGreen);
+      textx = (percentiles.at(criterionName)).at(requiredPercentile);
+      texty = h_criterionHist_global->GetMaximum();
+      text->DrawText(textx, texty, (std::to_string(requiredPercentile)).c_str());
+    }
+    cutLine = lines->DrawLine(cutValue, h_criterionHist_global->GetMinimum(), cutValue, h_criterionHist_global->GetMaximum());
+    cutLine->SetLineColor(kRed);
+    text->SetTextColor(kRed);
+    textx = cutValue;
+    texty = h_criterionHist_global->GetMinimum();
+    text->DrawText(textx, texty, "medID");
     c->SaveAs(outputFileName.c_str());
 
     outputFileName = "plots/global/" + criterionName + "_" + inputType + "_TruthMatched";
@@ -159,14 +175,14 @@ std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, st
     gStyle->SetOptStat(110010);
     h_criterionHist_global->Draw();
     for (const int& requiredPercentile: requiredPercentiles) {
-      TLine *percentileLine = lines->DrawLine((percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMinimum(), (percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMaximum());
+      percentileLine = lines->DrawLine((percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMinimum(), (percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMaximum());
       percentileLine->SetLineColor(kGreen);
       text->SetTextColor(kGreen);
       textx = (percentiles.at(criterionName)).at(requiredPercentile);
       texty = h_criterionHist_global->GetMaximum();
       text->DrawText(textx, texty, (std::to_string(requiredPercentile)).c_str());
     }
-    TLine *cutLine = lines->DrawLine(cutValue, h_criterionHist_global->GetMinimum(), cutValue, h_criterionHist_global->GetMaximum());
+    cutLine = lines->DrawLine(cutValue, h_criterionHist_global->GetMinimum(), cutValue, h_criterionHist_global->GetMaximum());
     cutLine->SetLineColor(kRed);
     text->SetTextColor(kRed);
     textx = cutValue;
@@ -178,7 +194,8 @@ std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, st
   inputFile->GetObject("photonType", h_photonType);
   h_photonType->StatOverflows(kTRUE);
   if (h_photonType) {
-    IDEfficiencies["overall"][IDEfficiencyType::nIDEfficiencyTypes] = (h_photonType->GetBinContent(h_photonType->FindFixBin(2.0)))/(h_photonType->GetBinContent(h_photonType->FindFixBin(5.0)));
+    IDEfficiencies["overall"][IDEfficiencyType::nIDEfficiencyTypes] = (h_photonType->GetBinContent(h_photonType->FindFixBin(2.0)))/(h_photonType->GetBinContent(h_photonType->FindFixBin(7.0)));
+    std::cout << "Ratio, loose/med = " << (h_photonType->GetBinContent(h_photonType->FindFixBin(6.0)))/(h_photonType->GetBinContent(h_photonType->FindFixBin(2.0))) << std::endl;
   }
   else {
     std::cout << "ERROR: histogram with name \"photonType\" not found!" << std::endl;
@@ -544,10 +561,10 @@ int main(int argc, char* argv[]) {
   gROOT->SetBatch();
   std::streamsize original_precision = std::cout.precision();
 
-  const float& chIso_cutMedium = 1.141;
-  const float& chIso_cutLoose = 6.0;
-  const float& sigmaIEtaIEta_cutMedium = 0.01015;
-  const float& sigmaIEtaIEta_cutLoose = 0.02;
+  // const float& chIso_cutMedium = 1.141;
+  // const float& chIso_cutLoose = 6.0;
+  // const float& sigmaIEtaIEta_cutMedium = 0.01015;
+  // const float& sigmaIEtaIEta_cutLoose = 0.02;
 
   std::cout << "Getting ratio of number of photons in fake range to number of photons in good range..." << std::endl;
   std::string prefix = "output_";
@@ -566,12 +583,12 @@ int main(int argc, char* argv[]) {
     {"hgg", kGreen}
   };
   assert(colors.size() == 3);
-  for (const auto& inputType: inputTypes) {
-    std::cout << inputType << ": without truth matching: " << std::endl;
-    getFakeToMediumRatioFromFile(inputFileNames[inputType], "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, inputType);
-    std::cout << inputType << ": with truth matching: " << std::endl;
-    getFakeToMediumRatioFromFile(inputFileNames[inputType], "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, true, inputType);
-  }
+  // for (const auto& inputType: inputTypes) {
+  //   std::cout << inputType << ": without truth matching: " << std::endl;
+  //   getFakeToMediumRatioFromFile(inputFileNames[inputType], "mediumFakeCriteria", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, false, inputType);
+  //   std::cout << inputType << ": with truth matching: " << std::endl;
+  //   getFakeToMediumRatioFromFile(inputFileNames[inputType], "mediumFakeCriteria_TruthMatched", chIso_cutMedium, chIso_cutLoose, sigmaIEtaIEta_cutMedium, sigmaIEtaIEta_cutLoose, true, inputType);
+  // }
 
   std::cout << "Now beginning to calculate ID efficiencies..." << std::endl;
   std::vector<std::string> photonIDCriteria = {"hOverE", "sigmaIEtaIEta", "chIso", "neutIso", "phoIso"};
