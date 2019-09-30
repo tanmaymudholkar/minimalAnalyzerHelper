@@ -569,16 +569,16 @@ int main(int argc, char* argv[]) {
   std::cout << "Getting ratio of number of photons in fake range to number of photons in good range..." << std::endl;
   std::string prefix = "output_";
   std::string suffix = ".root";
-  std::vector<std::string> inputTypes = {"fastsim", "fullsim", "hgg"};
+  std::vector<std::string> inputTypes = {"EMEnrichedQCD", "fullsim", "hgg"};
   assert(inputTypes.size() == 3);
   std::map<std::string, std::string> inputFileNames = {
-    {"fastsim", "output_stealth_privateMC_fastsim.root"},
+    {"EMEnrichedQCD", "output_EMEnrichedQCD_Pt40ToInf.root"},
     {"fullsim", "output_stealth_privateMC_fullsim.root"},
     {"hgg", "output_hgg.root"}
   };
   assert(inputFileNames.size() == 3);
   std::map<std::string, int> colors = {
-    {"fastsim", kBlue},
+    {"EMEnrichedQCD", kBlue},
     {"fullsim", kRed},
     {"hgg", kGreen}
   };

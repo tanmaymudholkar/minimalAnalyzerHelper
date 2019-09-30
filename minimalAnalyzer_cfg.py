@@ -30,10 +30,12 @@ process.load("temp.MinimalMiniAODAnalyzer.minimalAnalyzer_cfi")
 process.minimalAnalyzer.outputPath = ("output_{t}.root").format(t=options.inputType)
 process.minimalAnalyzer.verbosity = options.verbosity
 if (options.inputType == "hgg"):
-    process.minimalAnalyzer.filterType = options.inputType
+    process.minimalAnalyzer.filterType = "hgg"
     process.minimalAnalyzer.selectJetsNearPhotons = True
-else:
+elif ("stealth" in options.inputType):
     process.minimalAnalyzer.filterType = "stealth"
+else:
+    process.minimalAnalyzer.filterType = "none"
 
 process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(options.maxEvents))
 
