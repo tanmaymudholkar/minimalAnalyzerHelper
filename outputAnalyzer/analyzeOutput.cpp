@@ -25,14 +25,28 @@
 enum class IDEfficiencyType{NMinus1_nonTruthMatched=0, NMinus1, global, nIDEfficiencyTypes};
 enum class correlationType{customized=0, pearson, nCorrelationTypes};
 
+float getSumContentsInBinIndexRange(TH1F* inputHist, const int& binMin, const int& binMax) {
+  assert(binMin >= 0);
+  assert(binMin <= binMax);
+  assert(binMax <= (1+inputHist->GetXaxis()->GetNbins()));
+  float sumContents = 0.;
+  for (int binIndex = binMin; binIndex <= binMax; ++binIndex) {
+    sumContents += inputHist->GetBinContent(binIndex);
+  }
+  return sumContents;
+}
+
 float getCutEfficiency(TH1F* inputHist, const float& cut, const bool& invertCut) {
   int cutBin = inputHist->GetXaxis()->FindFixBin(cut);
   float binLowEdge = inputHist->GetXaxis()->GetBinLowEdge(cutBin);
   float cutBin_fraction_below = (cut-binLowEdge)/(inputHist->GetXaxis()->GetBinWidth(cutBin));
   float cutBin_fraction_above = 1.0-cutBin_fraction_below;
-  float belowCut = cutBin_fraction_below*inputHist->GetBinContent(cutBin) + inputHist->Integral(0, std::max(0, cutBin-1));
-  float aboveCut = cutBin_fraction_above*inputHist->GetBinContent(cutBin) + inputHist->Integral(std::min(1+cutBin, 1+inputHist->GetXaxis()->GetNbins()), 1+inputHist->GetXaxis()->GetNbins());
-  float all = inputHist->Integral(0, 1+inputHist->GetXaxis()->GetNbins());
+  // float belowCut = cutBin_fraction_below*inputHist->GetBinContent(cutBin) + inputHist->Integral(0, std::max(0, cutBin-1));
+  float belowCut = cutBin_fraction_below*inputHist->GetBinContent(cutBin) + ((cutBin == 0)? 0.0 : getSumContentsInBinIndexRange(inputHist, 0, cutBin));
+  // float aboveCut = cutBin_fraction_above*inputHist->GetBinContent(cutBin) + inputHist->Integral(std::min(1+cutBin, 1+inputHist->GetXaxis()->GetNbins()), 1+inputHist->GetXaxis()->GetNbins());
+  float aboveCut = cutBin_fraction_above*inputHist->GetBinContent(cutBin) + ((cutBin == (1+inputHist->GetXaxis()->GetNbins()))? 0.0 : getSumContentsInBinIndexRange(inputHist, 1+cutBin, 1+inputHist->GetXaxis()->GetNbins()));
+  // float all = inputHist->Integral(0, 1+inputHist->GetXaxis()->GetNbins());
+  float all = getSumContentsInBinIndexRange(inputHist, 0, 1+inputHist->GetXaxis()->GetNbins());
   if (invertCut) return (aboveCut/all);
   return (belowCut/all);
 }
@@ -110,6 +124,18 @@ std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, st
   std::map<std::string, std::map<int, float> > percentiles;
   std::map<std::string, std::map<IDEfficiencyType, float> > IDEfficiencies;
   TFile *inputFile = TFile::Open(inputFileName.c_str(), "READ");
+
+  std::string outputFileName;
+  TCanvas *c;
+  TLine *lines = new TLine();
+  TLine *cutLine;
+  TLine *percentileLine;
+  TText *text = new TText();
+  text->SetTextAlign(21);
+  // text->SetTextAngle(90);
+  text->SetTextSize(0.02);
+  float textx = -1.;
+  float texty = -1.;
   for (auto&& criterionCutPair: criteriaCuts) {
     auto& criterionName = criterionCutPair.first;
     auto& cutValue = criterionCutPair.second;
@@ -134,18 +160,6 @@ std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, st
       percentiles[criterionName][requiredPercentile] = getNthPercentile(h_criterionHist_global, requiredPercentile/100., false);
     }
 
-    std::string outputFileName;
-    TCanvas *c;
-    TLine *lines = new TLine();
-    TLine *cutLine;
-    TLine *percentileLine;
-    TText *text = new TText();
-    text->SetTextAlign(21);
-    // text->SetTextAngle(90);
-    text->SetTextSize(0.02);
-    float textx = -1.;
-    float texty = -1.;
-
     outputFileName= "plots/NMinus1/" + criterionName + "_" + inputType + "_TruthMatched";
     c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
     outputFileName += ".png";
@@ -153,18 +167,18 @@ std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, st
     gStyle->SetOptStat(110010);
     h_criterionHist_truthMatched->Draw();
     for (const int& requiredPercentile: requiredPercentiles) {
-      percentileLine = lines->DrawLine((percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMinimum(), (percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_global->GetMaximum());
+      percentileLine = lines->DrawLine((percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_truthMatched->GetMinimum(), (percentiles.at(criterionName)).at(requiredPercentile), h_criterionHist_truthMatched->GetMaximum());
       percentileLine->SetLineColor(kGreen);
       text->SetTextColor(kGreen);
       textx = (percentiles.at(criterionName)).at(requiredPercentile);
-      texty = h_criterionHist_global->GetMaximum();
+      texty = h_criterionHist_truthMatched->GetMaximum();
       text->DrawText(textx, texty, (std::to_string(requiredPercentile)).c_str());
     }
-    cutLine = lines->DrawLine(cutValue, h_criterionHist_global->GetMinimum(), cutValue, h_criterionHist_global->GetMaximum());
+    cutLine = lines->DrawLine(cutValue, h_criterionHist_truthMatched->GetMinimum(), cutValue, h_criterionHist_truthMatched->GetMaximum());
     cutLine->SetLineColor(kRed);
     text->SetTextColor(kRed);
     textx = cutValue;
-    texty = h_criterionHist_global->GetMinimum();
+    texty = h_criterionHist_truthMatched->GetMinimum();
     text->DrawText(textx, texty, "medID");
     c->SaveAs(outputFileName.c_str());
 
@@ -190,6 +204,39 @@ std::pair<std::map<std::string, std::map<int, float> >, std::map<std::string, st
     text->DrawText(textx, texty, "medID");
     c->SaveAs(outputFileName.c_str());
   }
+
+  TH1F *h_genChIso;
+  inputFile->GetObject("genLevelChargedHadronIsolation", h_genChIso);
+  assert(h_genChIso != nullptr);
+  h_genChIso->StatOverflows(kTRUE);
+  float cutEfficiency_genChIso = getCutEfficiency(h_genChIso, criteriaCuts.at("chIso"), false);
+  std::cout << "Gen-level charged isolation cut efficiency: " << cutEfficiency_genChIso << std::endl;
+  std::map<int, float> genChIsoPercentiles;
+  for (const int& requiredPercentile: requiredPercentiles) {
+    genChIsoPercentiles[requiredPercentile] = getNthPercentile(h_genChIso, requiredPercentile/100., false);
+  }
+  outputFileName= "plots/genLevelChIso/genLevelChIso_" + inputType;
+  c = new TCanvas(("c_output_" + outputFileName).c_str(), "c_output");
+  outputFileName += ".png";
+  gPad->SetLogy();
+  gStyle->SetOptStat(110010);
+  h_genChIso->Draw();
+  for (const int& requiredPercentile: requiredPercentiles) {
+    percentileLine = lines->DrawLine(genChIsoPercentiles.at(requiredPercentile), h_genChIso->GetMinimum(), genChIsoPercentiles.at(requiredPercentile), h_genChIso->GetMaximum());
+    percentileLine->SetLineColor(kGreen);
+    text->SetTextColor(kGreen);
+    textx = genChIsoPercentiles.at(requiredPercentile);
+    texty = h_genChIso->GetMaximum();
+    text->DrawText(textx, texty, (std::to_string(requiredPercentile)).c_str());
+  }
+  cutLine = lines->DrawLine(criteriaCuts.at("chIso"), h_genChIso->GetMinimum(), criteriaCuts.at("chIso"), h_genChIso->GetMaximum());
+  cutLine->SetLineColor(kRed);
+  text->SetTextColor(kRed);
+  textx = criteriaCuts.at("chIso");
+  texty = h_genChIso->GetMinimum();
+  text->DrawText(textx, texty, "medID");
+  c->SaveAs(outputFileName.c_str());
+
   TH1F *h_photonType;
   inputFile->GetObject("photonType", h_photonType);
   h_photonType->StatOverflows(kTRUE);
@@ -569,16 +616,16 @@ int main(int argc, char* argv[]) {
   std::cout << "Getting ratio of number of photons in fake range to number of photons in good range..." << std::endl;
   std::string prefix = "output_";
   std::string suffix = ".root";
-  std::vector<std::string> inputTypes = {"EMEnrichedQCD", "fullsim", "hgg"};
+  std::vector<std::string> inputTypes = {"stealth2017_t5Wg", "fullsim", "hgg"};
   assert(inputTypes.size() == 3);
   std::map<std::string, std::string> inputFileNames = {
-    {"EMEnrichedQCD", "output_EMEnrichedQCD_Pt40ToInf.root"},
+    {"stealth2017_t5Wg", "output_stealth2017_t5Wg.root"},
     {"fullsim", "output_stealth_privateMC_fullsim.root"},
     {"hgg", "output_hgg.root"}
   };
   assert(inputFileNames.size() == 3);
   std::map<std::string, int> colors = {
-    {"EMEnrichedQCD", kBlue},
+    {"stealth2017_t5Wg", kBlue},
     {"fullsim", kRed},
     {"hgg", kGreen}
   };
