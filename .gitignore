@@ -2,3 +2,4 @@
 plots/*
 inputFileList_*.txt
 outputAnalyzer/analyzeOutput
+crab.log

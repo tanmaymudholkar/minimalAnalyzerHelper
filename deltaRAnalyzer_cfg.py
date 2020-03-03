@@ -1,18 +1,20 @@
 import FWCore.ParameterSet.Config as cms
 from FWCore.ParameterSet.VarParsing import VarParsing
 
+import sys
+
 options = VarParsing ('analysis')
-# options.register(name="inputType",
-#                  default="none",
-#                  mult=VarParsing.multiplicity.singleton,
-# 		 mytype=VarParsing.varType.string,
-# 		 info="Input to run on. Currently supported: \"hgg\" or \"stealth\" or \"stealth2017_t5Wg\" or \"stealth2017_t6Wg\" or \"stealth_privateMC_fastsim\" or \"stealth_privateMC_fullsim\".")
 options.register(name="inputPath",
                  default="none",
                  mult=VarParsing.multiplicity.singleton,
 		 mytype=VarParsing.varType.string,
 		 info="Path to file containing list of MINIAOD sources.")
-options.register(name="outputPath",
+options.register(name="eventProgenitor",
+                 default="event progenitor",
+                 mult=VarParsing.multiplicity.singleton,
+		 mytype=VarParsing.varType.string,
+		 info="Event progenitor: \"squark\" or \"gluino\".")
+options.register(name="manualOutputPath",
                  default="none",
                  mult=VarParsing.multiplicity.singleton,
 		 mytype=VarParsing.varType.string,
@@ -25,22 +27,33 @@ options.register(name="verbosity",
 options.parseArguments()
 
 process = cms.Process("GenLevelDeltaRAnalyzer")
-process.load("FWCore.MessageService.MessageLogger_cfi")
-process.MessageLogger.cerr.FwkReport.reportEvery = 1000
-
+process.load("temp.GenLevelDeltaRAnalyzer.customLogger_cfi")
+# process.load("FWCore.MessageLogger.MessageLogger_cfi")
 process.load("temp.GenLevelDeltaRAnalyzer.genLevelDeltaRAnalyzer_cfi")
 
 process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(options.maxEvents))
-process.genLevelDeltaRAnalyzer.outputPath = options.outputPath
+if ((options.eventProgenitor == "squark") or (options.eventProgenitor == "gluino")):
+    process.genLevelDeltaRAnalyzer.eventProgenitor = options.eventProgenitor
+else:
+    sys.exit("ERROR: options.eventProgenitor can be one of \"squark\" or \"gluino\".")
+process.genLevelDeltaRAnalyzer.verbosity = options.verbosity
+
+outputPath = "deltaRNtuple.root"
+if not(options.manualOutputPath == "none"): outputPath = options.manualOutputPath
+process.TFileService = cms.Service("TFileService",
+                                   fileName = cms.string(outputPath)
+)
 
 listOfInputFiles = []
-inputFileNamesFileObject = open(options.inputPath, 'r')
-for inputFileName in inputFileNamesFileObject:
-    if (inputFileName[:5] != "file:" ):
-        listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + inputFileName.strip())
-    else:
-        listOfInputFiles.append(inputFileName.strip())
-inputFileNamesFileObject.close()
+if not(options.inputPath == "none"):
+    inputFileNamesFileObject = open(options.inputPath, 'r')
+    for inputFileName in inputFileNamesFileObject:
+        if (inputFileName[:5] != "file:" ):
+            listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + inputFileName.strip())
+        else:
+            listOfInputFiles.append(inputFileName.strip())
+    inputFileNamesFileObject.close()
+
 process.source = cms.Source("PoolSource",
                             fileNames = cms.untracked.vstring(*tuple(listOfInputFiles))
 )
