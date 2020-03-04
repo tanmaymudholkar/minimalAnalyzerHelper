@@ -5,3 +5,4 @@ inputFile_*.txt
 outputAnalyzer/analyzeOutput
 crab.log
 makeDeltaRPlots/makeDeltaRPlots
+*_output.txt
