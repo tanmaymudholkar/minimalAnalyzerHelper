@@ -1,5 +1,7 @@
 *.root
 plots/*
 inputFileList_*.txt
+inputFile_*.txt
 outputAnalyzer/analyzeOutput
 crab.log
+makeDeltaRPlots/makeDeltaRPlots
