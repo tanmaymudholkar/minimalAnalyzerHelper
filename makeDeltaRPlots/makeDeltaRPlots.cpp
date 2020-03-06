@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
   // argv[2]: outputFilePath, path to output file
   // argv[3]: MCTemplatePath, path to MC template file
   gROOT->SetBatch();
-  // std::streamsize original_precision = std::cout.precision();
+  std::streamsize original_precision = std::cout.precision();
   // (void)original_precision;
 
   std::string inputFilePath(argv[1]);
@@ -36,12 +36,16 @@ int main(int argc, char* argv[]) {
   inputFile_deltaRNtuples.open(inputFilePath);
   assert(inputFile_deltaRNtuples.is_open());
   std::string path_deltaRNtuples;
-  TChain inputChain("genLevelDeltaRAnalyzer/deltaRTree");
+
+  TChain inputChain_eventInfo("genLevelDeltaRAnalyzer/eventInfoTree");
+  TChain inputChain_truePhoton("genLevelDeltaRAnalyzer/deltaRTree");
+
   while (std::getline(inputFile_deltaRNtuples, path_deltaRNtuples)) {
-    inputChain.Add(path_deltaRNtuples.c_str());
+    inputChain_eventInfo.Add(path_deltaRNtuples.c_str());
+    inputChain_truePhoton.Add(path_deltaRNtuples.c_str());
   }
   inputFile_deltaRNtuples.close();
-  // Long64_t totalNEntries = inputChain.GetEntries();
+  // Long64_t totalNEntries = inputChain_truePhoton.GetEntries();
   // std::cout << "Available nEntries = " << totalNEntries << std::endl;
   // assert(totalNEntries > 0);
 
@@ -50,6 +54,7 @@ int main(int argc, char* argv[]) {
   MCTemplateReader templateReader = MCTemplateReader(MCTemplatePath);
 
   // step1: create histograms
+  std::map<int, std::map<int, TH1F> > histograms_eventInfo_photonPairDeltaR;
   std::map<int, std::map<int, TH1F> > histograms_deltaR_closestGenJet;
   std::map<int, std::map<int, TH1F> > histograms_deltaR_secondClosestGenJet;
   std::map<int, std::map<int, TH1F> > histograms_photonPT;
@@ -69,49 +74,73 @@ int main(int argc, char* argv[]) {
     for (int neutralinoBinIndex = 1; neutralinoBinIndex <= templateReader.nNeutralinoMassBins; ++neutralinoBinIndex) {
       if (templateReader.isValidBin(eventProgenitorBinIndex, neutralinoBinIndex)) {
 	std::string massBinID = "_eventProgenitorBin_" + std::to_string(eventProgenitorBinIndex) + "_neutralinoBin_" + std::to_string(neutralinoBinIndex);
-	histograms_deltaR_closestGenJet[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_deltaR_closestGenJet" + massBinID).c_str(), ("h_deltaR_closestGenJet" + massBinID + ";deltaR, closest GenJet;truth-matched EB #gamma").c_str(), 200, -0.15, 3.85);
-	histograms_deltaR_secondClosestGenJet[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_deltaR_secondClosestGenJet" + massBinID).c_str(), ("h_deltaR_secondClosestGenJet" + massBinID + ";deltaR, second-closest GenJet;truth-matched EB #gamma").c_str(), 200, -0.15, 3.85);
-	histograms_photonPT[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_photonPT" + massBinID).c_str(), ("h_photonPT" + massBinID + ";photonPT;truth-matched EB #gamma").c_str(), 250, 0., 1500.);
-	histograms_closestGenJet_PT[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_PT" + massBinID).c_str(), ("h_closestGenJet_PT" + massBinID + ";PT, closest GenJet;truth-matched EB #gamma").c_str(), 250, 0., 1500.);
-	histograms_closestGenJet_fraction_EM[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_fraction_EM" + massBinID).c_str(), ("h_closestGenJet_fraction_EM" + massBinID + ";EM fraction, closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_closestGenJet_fraction_hadronic[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_fraction_hadronic" + massBinID).c_str(), ("h_closestGenJet_fraction_hadronic" + massBinID + ";hadronic fraction, closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_closestGenJet_fraction_invisible[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_fraction_invisible" + massBinID).c_str(), ("h_closestGenJet_fraction_invisible" + massBinID + ";invisible fraction, closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_closestGenJet_fraction_aux[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_fraction_aux" + massBinID).c_str(), ("h_closestGenJet_fraction_aux" + massBinID + ";aux fraction, closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_closestGenJet_totalFraction[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_totalFraction" + massBinID).c_str(), ("h_closestGenJet_totalFraction" + massBinID + ";total fraction, closestGenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_secondClosestGenJet_PT[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_PT" + massBinID).c_str(), ("h_secondClosestGenJet_PT" + massBinID + ";PT, second-closest GenJet;truth-matched EB #gamma").c_str(), 250, 0., 1500.);
-	histograms_secondClosestGenJet_fraction_EM[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_fraction_EM" + massBinID).c_str(), ("h_secondClosestGenJet_fraction_EM" + massBinID + ";EM fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_secondClosestGenJet_fraction_hadronic[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_fraction_hadronic" + massBinID).c_str(), ("h_secondClosestGenJet_fraction_hadronic" + massBinID + ";hadronic fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_secondClosestGenJet_fraction_invisible[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_fraction_invisible" + massBinID).c_str(), ("h_secondClosestGenJet_fraction_invisible" + massBinID + ";invisible fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_secondClosestGenJet_fraction_aux[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_fraction_aux" + massBinID).c_str(), ("h_secondClosestGenJet_fraction_aux" + massBinID + ";aux fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
-	histograms_secondClosestGenJet_totalFraction[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_totalFraction" + massBinID).c_str(), ("h_secondClosestGenJet_totalFraction" + massBinID + ";total fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+        std::stringstream massDescriptionStringStream;
+	massDescriptionStringStream << std::fixed << std::setprecision(1) << ", m_{#tilde{g}}: " << (templateReader.eventProgenitorMasses).at(eventProgenitorBinIndex) << "GeV, m_{#tilde{#chi}_{1}^{0}}: " << (templateReader.neutralinoMasses).at(neutralinoBinIndex) << "GeV" << std::setprecision(original_precision);
+	std::string massDescriptionString = massDescriptionStringStream.str();
+	histograms_eventInfo_photonPairDeltaR[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_eventInfo_photonPairDeltaR" + massBinID).c_str(), ("deltaR_photonPair" + massDescriptionString + ";deltaR, photon pair;events").c_str(), 200, 0., 4.0);
+	histograms_deltaR_closestGenJet[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_deltaR_closestGenJet" + massBinID).c_str(), ("deltaR_closestGenJet" + massDescriptionString + ";deltaR, closest GenJet;truth-matched EB #gamma").c_str(), 200, -0.15, 3.85);
+	histograms_deltaR_secondClosestGenJet[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_deltaR_secondClosestGenJet" + massBinID).c_str(), ("deltaR_secondClosestGenJet" + massDescriptionString + ";deltaR, second-closest GenJet;truth-matched EB #gamma").c_str(), 200, -0.15, 3.85);
+	histograms_photonPT[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_photonPT" + massBinID).c_str(), ("photonPT" + massDescriptionString + ";photonPT;truth-matched EB #gamma").c_str(), 250, 0., 1500.);
+	histograms_closestGenJet_PT[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_PT" + massBinID).c_str(), ("closestGenJet_PT" + massDescriptionString + ";PT, closest GenJet;truth-matched EB #gamma").c_str(), 250, 0., 1500.);
+	histograms_closestGenJet_fraction_EM[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_fraction_EM" + massBinID).c_str(), ("closestGenJet_fraction_EM" + massDescriptionString + ";EM fraction, closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_closestGenJet_fraction_hadronic[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_fraction_hadronic" + massBinID).c_str(), ("closestGenJet_fraction_hadronic" + massDescriptionString + ";hadronic fraction, closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_closestGenJet_fraction_invisible[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_fraction_invisible" + massBinID).c_str(), ("closestGenJet_fraction_invisible" + massDescriptionString + ";invisible fraction, closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_closestGenJet_fraction_aux[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_fraction_aux" + massBinID).c_str(), ("closestGenJet_fraction_aux" + massDescriptionString + ";aux fraction, closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_closestGenJet_totalFraction[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_closestGenJet_totalFraction" + massBinID).c_str(), ("closestGenJet_totalFraction" + massDescriptionString + ";total fraction, closestGenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_secondClosestGenJet_PT[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_PT" + massBinID).c_str(), ("secondClosestGenJet_PT" + massDescriptionString + ";PT, second-closest GenJet;truth-matched EB #gamma").c_str(), 250, 0., 1500.);
+	histograms_secondClosestGenJet_fraction_EM[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_fraction_EM" + massBinID).c_str(), ("secondClosestGenJet_fraction_EM" + massDescriptionString + ";EM fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_secondClosestGenJet_fraction_hadronic[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_fraction_hadronic" + massBinID).c_str(), ("secondClosestGenJet_fraction_hadronic" + massDescriptionString + ";hadronic fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_secondClosestGenJet_fraction_invisible[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_fraction_invisible" + massBinID).c_str(), ("secondClosestGenJet_fraction_invisible" + massDescriptionString + ";invisible fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_secondClosestGenJet_fraction_aux[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_fraction_aux" + massBinID).c_str(), ("secondClosestGenJet_fraction_aux" + massDescriptionString + ";aux fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
+	histograms_secondClosestGenJet_totalFraction[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_secondClosestGenJet_totalFraction" + massBinID).c_str(), ("secondClosestGenJet_totalFraction" + massDescriptionString + ";total fraction, second-closest GenJet;truth-matched EB #gamma").c_str(), 103, -0.015, 1.015);
       }
     }
   }
 
   // step 2: fill histograms
-  TTreeReader inputChainReader(&inputChain);
-  TTreeReaderValue<float> evt_eventProgenitorMass(inputChainReader, "evt_eventProgenitorMass");
-  TTreeReaderValue<float> evt_neutralinoMass(inputChainReader, "evt_neutralinoMass");
-  TTreeReaderValue<float> deltaR_closestGenJet(inputChainReader, "deltaR_closestGenJet");
-  TTreeReaderValue<float> deltaR_secondClosestGenJet(inputChainReader, "deltaR_secondClosestGenJet");
-  TTreeReaderValue<int>   photonMom_pdgId(inputChainReader, "photonMom_pdgId");
-  TTreeReaderValue<float> photonPT(inputChainReader, "photonPT");
-  TTreeReaderValue<float> closestGenJet_PT(inputChainReader, "closestGenJet_PT");
-  TTreeReaderValue<float> closestGenJet_fraction_EM(inputChainReader, "closestGenJet_fraction_EM");
-  TTreeReaderValue<float> closestGenJet_fraction_hadronic(inputChainReader, "closestGenJet_fraction_hadronic");
-  TTreeReaderValue<float> closestGenJet_fraction_invisible(inputChainReader, "closestGenJet_fraction_invisible");
-  TTreeReaderValue<float> closestGenJet_fraction_aux(inputChainReader, "closestGenJet_fraction_aux");
-  TTreeReaderValue<float> closestGenJet_totalFraction(inputChainReader, "closestGenJet_totalFraction");
-  TTreeReaderValue<float> secondClosestGenJet_PT(inputChainReader, "secondClosestGenJet_PT");
-  TTreeReaderValue<float> secondClosestGenJet_fraction_EM(inputChainReader, "secondClosestGenJet_fraction_EM");
-  TTreeReaderValue<float> secondClosestGenJet_fraction_hadronic(inputChainReader, "secondClosestGenJet_fraction_hadronic");
-  TTreeReaderValue<float> secondClosestGenJet_fraction_invisible(inputChainReader, "secondClosestGenJet_fraction_invisible");
-  TTreeReaderValue<float> secondClosestGenJet_fraction_aux(inputChainReader, "secondClosestGenJet_fraction_aux");
-  TTreeReaderValue<float> secondClosestGenJet_totalFraction(inputChainReader, "secondClosestGenJet_totalFraction");
   Long64_t entryIndex = 0;
   TAxis eventProgenitorAxisReference = TAxis(templateReader.nEventProgenitorMassBins, templateReader.minEventProgenitorMass, templateReader.maxEventProgenitorMass);
   TAxis neutralinoAxisReference = TAxis(templateReader.nNeutralinoMassBins, templateReader.minNeutralinoMass, templateReader.maxNeutralinoMass);
-  while(inputChainReader.Next()) {
+
+  std::cout << "Beginning to fill event-info histograms..." << std::endl;
+  TTreeReader inputChainReader_eventInfo(&inputChain_eventInfo);
+  TTreeReaderValue<float> evt_deltaR_photonPair(inputChainReader_eventInfo, "deltaR_photonPair");
+  TTreeReaderValue<float> eventProgenitorMass(inputChainReader_eventInfo, "eventProgenitorMass");
+  TTreeReaderValue<float> neutralinoMass(inputChainReader_eventInfo, "neutralinoMass");
+  entryIndex = 0;
+  while(inputChainReader_eventInfo.Next()) {
+    if (entryIndex%200000 == 0) std::cout << "Control at entryIndex = " << entryIndex << std::endl;
+    ++entryIndex;
+
+    int eventProgenitorBinIndex = eventProgenitorAxisReference.FindFixBin(*eventProgenitorMass);
+    int neutralinoBinIndex = neutralinoAxisReference.FindFixBin(*neutralinoMass);
+    if (!(templateReader.isValidBin(eventProgenitorBinIndex, neutralinoBinIndex))) continue;
+
+    ((histograms_eventInfo_photonPairDeltaR.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(*evt_deltaR_photonPair);
+  }
+
+  std::cout << "Beginning to fill photon histograms..." << std::endl;
+  TTreeReader inputChainReader_truePhoton(&inputChain_truePhoton);
+  TTreeReaderValue<float> evt_eventProgenitorMass(inputChainReader_truePhoton, "evt_eventProgenitorMass");
+  TTreeReaderValue<float> evt_neutralinoMass(inputChainReader_truePhoton, "evt_neutralinoMass");
+  TTreeReaderValue<float> deltaR_closestGenJet(inputChainReader_truePhoton, "deltaR_closestGenJet");
+  TTreeReaderValue<float> deltaR_secondClosestGenJet(inputChainReader_truePhoton, "deltaR_secondClosestGenJet");
+  TTreeReaderValue<int>   photonMom_pdgId(inputChainReader_truePhoton, "photonMom_pdgId");
+  TTreeReaderValue<float> photonPT(inputChainReader_truePhoton, "photonPT");
+  TTreeReaderValue<float> closestGenJet_PT(inputChainReader_truePhoton, "closestGenJet_PT");
+  TTreeReaderValue<float> closestGenJet_fraction_EM(inputChainReader_truePhoton, "closestGenJet_fraction_EM");
+  TTreeReaderValue<float> closestGenJet_fraction_hadronic(inputChainReader_truePhoton, "closestGenJet_fraction_hadronic");
+  TTreeReaderValue<float> closestGenJet_fraction_invisible(inputChainReader_truePhoton, "closestGenJet_fraction_invisible");
+  TTreeReaderValue<float> closestGenJet_fraction_aux(inputChainReader_truePhoton, "closestGenJet_fraction_aux");
+  TTreeReaderValue<float> closestGenJet_totalFraction(inputChainReader_truePhoton, "closestGenJet_totalFraction");
+  TTreeReaderValue<float> secondClosestGenJet_PT(inputChainReader_truePhoton, "secondClosestGenJet_PT");
+  TTreeReaderValue<float> secondClosestGenJet_fraction_EM(inputChainReader_truePhoton, "secondClosestGenJet_fraction_EM");
+  TTreeReaderValue<float> secondClosestGenJet_fraction_hadronic(inputChainReader_truePhoton, "secondClosestGenJet_fraction_hadronic");
+  TTreeReaderValue<float> secondClosestGenJet_fraction_invisible(inputChainReader_truePhoton, "secondClosestGenJet_fraction_invisible");
+  TTreeReaderValue<float> secondClosestGenJet_fraction_aux(inputChainReader_truePhoton, "secondClosestGenJet_fraction_aux");
+  TTreeReaderValue<float> secondClosestGenJet_totalFraction(inputChainReader_truePhoton, "secondClosestGenJet_totalFraction");
+  entryIndex = 0;
+  while(inputChainReader_truePhoton.Next()) {
     if (entryIndex%200000 == 0) std::cout << "Control at entryIndex = " << entryIndex << std::endl;
     ++entryIndex;
 
@@ -140,6 +169,7 @@ int main(int argc, char* argv[]) {
   for (int eventProgenitorBinIndex = 1; eventProgenitorBinIndex <= templateReader.nEventProgenitorMassBins; ++eventProgenitorBinIndex) {
     for (int neutralinoBinIndex = 1; neutralinoBinIndex <= templateReader.nNeutralinoMassBins; ++neutralinoBinIndex) {
       if (templateReader.isValidBin(eventProgenitorBinIndex, neutralinoBinIndex)) {
+	outputFile->WriteTObject(&((histograms_eventInfo_photonPairDeltaR.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
 	outputFile->WriteTObject(&((histograms_deltaR_closestGenJet.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
 	outputFile->WriteTObject(&((histograms_deltaR_secondClosestGenJet.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
 	outputFile->WriteTObject(&((histograms_photonPT.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
