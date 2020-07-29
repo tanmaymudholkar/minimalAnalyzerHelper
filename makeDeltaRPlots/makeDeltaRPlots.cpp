@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
         std::stringstream massDescriptionStringStream;
 	massDescriptionStringStream << std::fixed << std::setprecision(1) << ", m_{#tilde{g}}: " << (templateReader.eventProgenitorMasses).at(eventProgenitorBinIndex) << "GeV, m_{#tilde{#chi}_{1}^{0}}: " << (templateReader.neutralinoMasses).at(neutralinoBinIndex) << "GeV" << std::setprecision(original_precision);
 	std::string massDescriptionString = massDescriptionStringStream.str();
-	histograms_eventInfo_photonPairDeltaR[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_eventInfo_photonPairDeltaR" + massBinID).c_str(), ("deltaR_photonPair" + massDescriptionString + ";deltaR, photon pair;events").c_str(), 200, 0., 4.0);
+	histograms_eventInfo_photonPairDeltaR[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_eventInfo_photonPairDeltaR" + massBinID).c_str(), ("deltaR_photonPair" + massDescriptionString + ";deltaR, photon pair;events").c_str(), 200, -0.15, 3.85);
 	histograms_deltaR_closestGenJet[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_deltaR_closestGenJet" + massBinID).c_str(), ("deltaR_closestGenJet" + massDescriptionString + ";deltaR, closest GenJet;truth-matched EB #gamma").c_str(), 200, -0.15, 3.85);
 	histograms_deltaR_secondClosestGenJet[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_deltaR_secondClosestGenJet" + massBinID).c_str(), ("deltaR_secondClosestGenJet" + massDescriptionString + ";deltaR, second-closest GenJet;truth-matched EB #gamma").c_str(), 200, -0.15, 3.85);
 	histograms_photonPT[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_photonPT" + massBinID).c_str(), ("photonPT" + massDescriptionString + ";photonPT;truth-matched EB #gamma").c_str(), 250, 0., 1500.);
@@ -104,6 +104,7 @@ int main(int argc, char* argv[]) {
 
   std::cout << "Beginning to fill event-info histograms..." << std::endl;
   TTreeReader inputChainReader_eventInfo(&inputChain_eventInfo);
+  TTreeReaderValue<int> nKinematicStealthPhotons(inputChainReader_eventInfo, "nKinematicStealthPhotons");
   TTreeReaderValue<float> evt_deltaR_photonPair(inputChainReader_eventInfo, "deltaR_photonPair");
   TTreeReaderValue<float> eventProgenitorMass(inputChainReader_eventInfo, "eventProgenitorMass");
   TTreeReaderValue<float> neutralinoMass(inputChainReader_eventInfo, "neutralinoMass");
@@ -111,6 +112,8 @@ int main(int argc, char* argv[]) {
   while(inputChainReader_eventInfo.Next()) {
     if (entryIndex%200000 == 0) std::cout << "Control at entryIndex = " << entryIndex << std::endl;
     ++entryIndex;
+
+    if (!(*nKinematicStealthPhotons == 2)) continue;
 
     int eventProgenitorBinIndex = eventProgenitorAxisReference.FindFixBin(*eventProgenitorMass);
     int neutralinoBinIndex = neutralinoAxisReference.FindFixBin(*neutralinoMass);

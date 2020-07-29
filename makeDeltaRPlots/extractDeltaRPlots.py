@@ -15,13 +15,10 @@ inputFile = ROOT.TFile.Open(inputFilePath, "READ")
 if ((inputFile.IsOpen() == ROOT.kFALSE) or (inputFile.IsZombie())): sys.exit("ERROR: unable to open file with name {n}".format(n=inputFilePath))
 
 prefixesToExtract = [
+    "eventInfo_photonPairDeltaR",
     "deltaR_closestGenJet",
-    "closestGenJet_PT",
-    "closestGenJet_fraction_EM",
     "closestGenJet_fraction_hadronic",
     "deltaR_secondClosestGenJet",
-    "secondClosestGenJet_PT",
-    "secondClosestGenJet_fraction_EM",
     "secondClosestGenJet_fraction_hadronic"
 ]
 
@@ -63,7 +60,7 @@ for prefixToExtract in prefixesToExtract:
         if (extractedHistogram):
             outputCanvas = ROOT.TCanvas("c_" + histogramNameToExtract, "c_" + histogramNameToExtract)
             extractedHistogram.Draw()
-            outputCanvas.SaveAs("{oF}/{fname}.pdf".format(oF=outputFolder, fname="{pTE}_{rC:04d}".format(pTE=prefixToExtract, rC=runningCounter)))
+            outputCanvas.SaveAs("{oF}/{fname}.png".format(oF=outputFolder, fname="{pTE}_{rC:04d}".format(pTE=prefixToExtract, rC=runningCounter)))
             runningCounter += 1
         else:
             sys.exit("ERROR: histogram initialized from path {p} is a nullptr.".format(p=histogramNameToExtract))
