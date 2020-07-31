@@ -8,8 +8,8 @@
 #include <vector>
 #include <cassert>
 
-#include "../CMSSW_10_2_10/src/temp/StealthTriggerEfficiency/interface/triggers.h"
-#include "../../STEALTH/eventSelection/include/constants.h"
+#include "../../CMSSW_10_2_10/src/temp/StealthTriggerEfficiency/interface/triggers.h"
+#include "../../../STEALTH/eventSelection/include/constants.h"
 
 #include "TROOT.h"
 #include "TFile.h"
@@ -28,7 +28,6 @@ int main(int argc, char* argv[]) {
   // argv[1]: inputFilePath, file containing paths to deltaR ntuples
   // argv[2]: outputFilePath, path to output file
   gROOT->SetBatch();
-  std::streamsize original_precision = std::cout.precision();
 
   std::string inputFilePath(argv[1]);
   std::cout << "Opening file containing paths to trigger efficiency ntuples: " << inputFilePath << std::endl;
@@ -37,11 +36,10 @@ int main(int argc, char* argv[]) {
   assert(inputFile_triggerEfficiencyNtuples.is_open());
   std::string path_triggerEfficiencyNtuples;
 
-  TChain inputChain_eventInfo("StealthTriggerEfficiency/eventInfoTree");
+  TChain inputChain_eventInfo("stealthTriggerEfficiency/eventInfoTree");
 
   while (std::getline(inputFile_triggerEfficiencyNtuples, path_triggerEfficiencyNtuples)) {
     inputChain_eventInfo.Add(path_triggerEfficiencyNtuples.c_str());
-    inputChain_truePhoton.Add(path_triggerEfficiencyNtuples.c_str());
   }
   inputFile_triggerEfficiencyNtuples.close();
   // Long64_t totalNEntries = inputChain_truePhoton.GetEntries();
@@ -51,11 +49,13 @@ int main(int argc, char* argv[]) {
   TFile *outputFile = TFile::Open(argv[2], "RECREATE");
 
   // step 1: create efficiencies
-  std::array<TEfficiency, (triggerPatterns::patternsToSave).size()> triggerEfficiencies;
+  std::map<unsigned int, TEfficiency*> triggerEfficiencies;
   for (unsigned int patternIndex = 0; patternIndex < (triggerPatterns::patternsToSave).size(); ++patternIndex) {
     std::string efficiencyName = "triggerEfficiency_patternIndex_" + std::to_string(patternIndex);
     std::string efficiencyTitle = "Efficiency: " + (triggerPatterns::patternsToSave)[patternIndex];
-    triggerEfficiencies[patternIndex] = TEfficiency(efficiencyName.c_str(), (efficiencyTitle + ";leading photon pT;").c_str(), ((HLTEmulation::pTBinEdges).size()-1), &((HLTEmulation::pTBinEdges).at(0)));
+    triggerEfficiencies[patternIndex] = new TEfficiency(efficiencyName.c_str(), (efficiencyTitle + ";leading photon pT;").c_str(), ((HLTEmulation::pTBinEdges).size()-1), &((HLTEmulation::pTBinEdges).at(0)));
+    triggerEfficiencies[patternIndex]->SetName(efficiencyName.c_str());
+    triggerEfficiencies[patternIndex]->SetTitle((efficiencyTitle + ";leading photon pT;").c_str());
   }
 
   // step 2: fill efficiencies
@@ -68,10 +68,10 @@ int main(int argc, char* argv[]) {
   TTreeReaderValue<float> pT_subLeadingPhoton(inputChainReader_eventInfo, "pT_subLeadingPhoton");
   TTreeReaderValue<float> eta_subLeadingPhoton(inputChainReader_eventInfo, "eta_subLeadingPhoton");
   TTreeReaderValue<bool> passesSelection(inputChainReader_eventInfo, "passesSelection");
-  std::array<TTreeReaderValue<bool>, (triggerPatterns::patternsToSave).size()> passesTrigger;
+  std::vector<TTreeReaderValue<bool> > triggerResults;
   for (unsigned int patternIndex = 0; patternIndex < (triggerPatterns::patternsToSave).size(); ++patternIndex) {
     std::string branchName = "passesTrigger_patternIndex_" + std::to_string(patternIndex);
-    passesTrigger[patternIndex] = TTreeReaderValue<bool>(inputChainReader_eventInfo, branchName.c_str());
+    triggerResults.push_back(TTreeReaderValue<bool>(inputChainReader_eventInfo, branchName.c_str()));
   }
 
   entryIndex = 0;
@@ -81,13 +81,13 @@ int main(int argc, char* argv[]) {
     if (!(*passesSelection)) continue;
 
     for (unsigned int patternIndex = 0; patternIndex < (triggerPatterns::patternsToSave).size(); ++patternIndex) {
-      triggerEfficiencies[patternIndex]->Fill(*(passesTrigger[patternIndex]), *pT_leadingPhoton);
+      triggerEfficiencies.at(patternIndex)->Fill(*(triggerResults.at(patternIndex)), *pT_leadingPhoton);
     }
   }
 
   // step 3: save efficiencies to output file
   for (unsigned int patternIndex = 0; patternIndex < (triggerPatterns::patternsToSave).size(); ++patternIndex) {
-    outputFile->WriteTObject(&(triggerEfficiencies[patternIndex]));
+    outputFile->WriteTObject(triggerEfficiencies.at(patternIndex));
   }
 
   outputFile->Close();

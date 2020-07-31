@@ -7,3 +7,4 @@ crab.log
 makeDeltaRPlots/makeDeltaRPlots
 *_output.txt
 crab_workArea*
+makeTriggerEfficiencyPlots/makeTriggerEfficiencyPlots
