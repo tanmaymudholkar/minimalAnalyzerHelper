@@ -1,8 +1,8 @@
 from CRABClient.UserUtilities import config
 config = config()
 
-config.General.requestName = "triggerEfficiency"
-config.General.workArea = "crab_workArea_triggerEfficiency"
+# config.General.requestName = "triggerEfficiency"
+# config.General.workArea = "crab_workArea_triggerEfficiency"
 config.General.transferLogs = False
 
 config.JobType.pluginName = "Analysis"
