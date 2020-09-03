@@ -7,6 +7,7 @@ targetsDict = {
     "inputFile_triggerEfficiencies_invMassCut60.txt": "/store/group/lpcsusystealth/triggerEfficiencyNTuples/invMassCut60",
     "inputFile_triggerEfficiencies_invMassCut90.txt": "/store/group/lpcsusystealth/triggerEfficiencyNTuples/invMassCut90",
     "inputFile_triggerEfficiencies_noVeto.txt": "/store/group/lpcsusystealth/triggerEfficiencyNTuples/noVeto",
+    "inputFile_triggerEfficiencies_extraTriggers.txt": "/store/group/lpcsusystealth/triggerEfficiencyNTuples/extraTriggers",
 }
 
 for (outFilePath, inputDir) in targetsDict.items():
