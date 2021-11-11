@@ -8,7 +8,7 @@
 #include <vector>
 #include <cassert>
 
-#include "../../../STEALTH/eventSelection/include/MCTemplateReader.h"
+#include "/uscms/home/tmudholk/private/stealth/STEALTH/eventSelection/include/MCTemplateReader.h"
 
 #include "TROOT.h"
 #include "TFile.h"
@@ -55,6 +55,10 @@ int main(int argc, char* argv[]) {
 
   // step1: create histograms
   std::map<int, std::map<int, TH1F> > histograms_eventInfo_photonPairDeltaR;
+  std::map<int, std::map<int, TH1F> > histograms_eventInfo_progenitor_eta;
+  std::map<int, std::map<int, TH1F> > histograms_eventInfo_neutralino_progenitor_child_eta;
+  std::map<int, std::map<int, TH1F> > histograms_eventInfo_neutralino_photon_mother_eta;
+  std::map<int, std::map<int, TH1F> > histograms_eventInfo_photon_eta;
   std::map<int, std::map<int, TH1F> > histograms_deltaR_closestGenJet;
   std::map<int, std::map<int, TH1F> > histograms_deltaR_secondClosestGenJet;
   std::map<int, std::map<int, TH1F> > histograms_photonPT;
@@ -78,6 +82,10 @@ int main(int argc, char* argv[]) {
 	massDescriptionStringStream << std::fixed << std::setprecision(1) << ", m_{#tilde{g}}: " << (templateReader.eventProgenitorMasses).at(eventProgenitorBinIndex) << "GeV, m_{#tilde{#chi}_{1}^{0}}: " << (templateReader.neutralinoMasses).at(neutralinoBinIndex) << "GeV" << std::setprecision(original_precision);
 	std::string massDescriptionString = massDescriptionStringStream.str();
 	histograms_eventInfo_photonPairDeltaR[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_eventInfo_photonPairDeltaR" + massBinID).c_str(), ("deltaR_photonPair" + massDescriptionString + ";deltaR, photon pair;events").c_str(), 200, -0.15, 3.85);
+	histograms_eventInfo_progenitor_eta[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_eventInfo_progenitor_eta" + massBinID).c_str(), ("progenitor eta" + massDescriptionString + ";eta;events").c_str(), 300, -3.0, 3.0);
+	histograms_eventInfo_neutralino_progenitor_child_eta[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_eventInfo_neutralino_progenitor_child_eta" + massBinID).c_str(), ("neutralino (progenitor child) eta" + massDescriptionString + ";eta;events").c_str(), 300, -3.0, 3.0);
+	histograms_eventInfo_neutralino_photon_mother_eta[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_eventInfo_neutralino_photon_mother_eta" + massBinID).c_str(), ("neutralino (photon parent) eta" + massDescriptionString + ";eta;events").c_str(), 300, -3.0, 3.0);
+	histograms_eventInfo_photon_eta[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_eventInfo_photon_eta" + massBinID).c_str(), ("photon eta" + massDescriptionString + ";photon eta;events").c_str(), 300, -3.0, 3.0);
 	histograms_deltaR_closestGenJet[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_deltaR_closestGenJet" + massBinID).c_str(), ("deltaR_closestGenJet" + massDescriptionString + ";deltaR, closest GenJet;truth-matched EB #gamma").c_str(), 200, -0.15, 3.85);
 	histograms_deltaR_secondClosestGenJet[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_deltaR_secondClosestGenJet" + massBinID).c_str(), ("deltaR_secondClosestGenJet" + massDescriptionString + ";deltaR, second-closest GenJet;truth-matched EB #gamma").c_str(), 200, -0.15, 3.85);
 	histograms_photonPT[eventProgenitorBinIndex][neutralinoBinIndex] = TH1F(("h_photonPT" + massBinID).c_str(), ("photonPT" + massDescriptionString + ";photonPT;truth-matched EB #gamma").c_str(), 250, 0., 1500.);
@@ -105,6 +113,12 @@ int main(int argc, char* argv[]) {
   std::cout << "Beginning to fill event-info histograms..." << std::endl;
   TTreeReader inputChainReader_eventInfo(&inputChain_eventInfo);
   TTreeReaderValue<int> nKinematicStealthPhotons(inputChainReader_eventInfo, "nKinematicStealthPhotons");
+  TTreeReaderValue<int> nEnergeticStealthPhotons(inputChainReader_eventInfo, "nEnergeticStealthPhotons");
+  TTreeReaderArray<float> evt_eta_progenitor(inputChainReader_eventInfo, "eta_progenitor");
+  TTreeReaderArray<float> evt_eta_neutralino_progenitor_child(inputChainReader_eventInfo, "eta_neutralino_progenitor_child");
+  TTreeReaderArray<float> evt_eta_neutralino_photon_mother(inputChainReader_eventInfo, "eta_neutralino_photon_mother");
+  TTreeReaderValue<float> evt_eta_photon_leading(inputChainReader_eventInfo, "eta_photon_leading");
+  TTreeReaderValue<float> evt_eta_photon_subleading(inputChainReader_eventInfo, "eta_photon_subleading");
   TTreeReaderValue<float> evt_deltaR_photonPair(inputChainReader_eventInfo, "deltaR_photonPair");
   TTreeReaderValue<float> eventProgenitorMass(inputChainReader_eventInfo, "eventProgenitorMass");
   TTreeReaderValue<float> neutralinoMass(inputChainReader_eventInfo, "neutralinoMass");
@@ -113,13 +127,36 @@ int main(int argc, char* argv[]) {
     if (entryIndex%200000 == 0) std::cout << "Control at entryIndex = " << entryIndex << std::endl;
     ++entryIndex;
 
-    if (!(*nKinematicStealthPhotons == 2)) continue;
-
     int eventProgenitorBinIndex = eventProgenitorAxisReference.FindFixBin(*eventProgenitorMass);
     int neutralinoBinIndex = neutralinoAxisReference.FindFixBin(*neutralinoMass);
-    if (!(templateReader.isValidBin(eventProgenitorBinIndex, neutralinoBinIndex))) continue;
+    bool is_valid_bin = false;
+    try {
+      is_valid_bin = (templateReader.isValidBin(eventProgenitorBinIndex, neutralinoBinIndex));
+    }
+    catch (const std::out_of_range& exception_oor) {
+      is_valid_bin = false;
+    }
+    if (!is_valid_bin) continue;
 
-    ((histograms_eventInfo_photonPairDeltaR.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(*evt_deltaR_photonPair);
+    if (*nEnergeticStealthPhotons == 2) {
+      ((histograms_eventInfo_photon_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(*evt_eta_photon_leading);
+      ((histograms_eventInfo_photon_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(*evt_eta_photon_subleading);
+      // ((histograms_eventInfo_neutralino_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(*evt_eta_neutralino_leading);
+      // ((histograms_eventInfo_neutralino_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(*evt_eta_neutralino_subleading);
+      assert(!evt_eta_progenitor.IsEmpty());
+      for (const float & eta : evt_eta_progenitor) {
+	((histograms_eventInfo_progenitor_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(eta);
+      }
+      assert(!evt_eta_neutralino_progenitor_child.IsEmpty());
+      for (const float & eta : evt_eta_neutralino_progenitor_child) {
+	((histograms_eventInfo_neutralino_progenitor_child_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(eta);
+      }
+      assert(!evt_eta_neutralino_photon_mother.IsEmpty());
+      for (const float & eta : evt_eta_neutralino_photon_mother) {
+	((histograms_eventInfo_neutralino_photon_mother_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(eta);
+      }
+    }
+    if (*nKinematicStealthPhotons == 2) ((histograms_eventInfo_photonPairDeltaR.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)).Fill(*evt_deltaR_photonPair);
   }
 
   std::cout << "Beginning to fill photon histograms..." << std::endl;
@@ -172,6 +209,11 @@ int main(int argc, char* argv[]) {
   for (int eventProgenitorBinIndex = 1; eventProgenitorBinIndex <= templateReader.nEventProgenitorMassBins; ++eventProgenitorBinIndex) {
     for (int neutralinoBinIndex = 1; neutralinoBinIndex <= templateReader.nNeutralinoMassBins; ++neutralinoBinIndex) {
       if (templateReader.isValidBin(eventProgenitorBinIndex, neutralinoBinIndex)) {
+	// outputFile->WriteTObject(&((histograms_eventInfo_neutralino_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
+	outputFile->WriteTObject(&((histograms_eventInfo_progenitor_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
+	outputFile->WriteTObject(&((histograms_eventInfo_neutralino_progenitor_child_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
+	outputFile->WriteTObject(&((histograms_eventInfo_neutralino_photon_mother_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
+	outputFile->WriteTObject(&((histograms_eventInfo_photon_eta.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
 	outputFile->WriteTObject(&((histograms_eventInfo_photonPairDeltaR.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
 	outputFile->WriteTObject(&((histograms_deltaR_closestGenJet.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));
 	outputFile->WriteTObject(&((histograms_deltaR_secondClosestGenJet.at(eventProgenitorBinIndex)).at(neutralinoBinIndex)));

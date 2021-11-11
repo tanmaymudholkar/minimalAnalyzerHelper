@@ -2,12 +2,15 @@
 
 from __future__ import print_function, division
 
-import ROOT
+import re
 import sys
 sys.path.append("/uscms/home/tmudholk/private/stealth/STEALTH")
 import stealthEnv
 
+import ROOT
 ROOT.gROOT.SetBatch(ROOT.kTRUE)
+
+EB_EE_TRANSITION_ETA = 1.479
 
 inputFilePath = "{eP}/store/group/lpcsusystealth/deltaRNtuples/histograms/deltaRHistograms_t5.root".format(eP=stealthEnv.EOSPrefix)
 outputFolder = "{aR}/deltaRPlots".format(aR=stealthEnv.analysisRoot)
@@ -16,6 +19,10 @@ if ((inputFile.IsOpen() == ROOT.kFALSE) or (inputFile.IsZombie())): sys.exit("ER
 
 prefixesToExtract = [
     "eventInfo_photonPairDeltaR",
+    "eventInfo_progenitor_eta",
+    "eventInfo_neutralino_progenitor_child_eta",
+    "eventInfo_neutralino_photon_mother_eta",
+    "eventInfo_photon_eta",
     "deltaR_closestGenJet",
     "closestGenJet_fraction_hadronic",
     "deltaR_secondClosestGenJet",
@@ -23,8 +30,7 @@ prefixesToExtract = [
 ]
 
 parameterSpaceBinsToExtract = [
-    (21, 2),
-    (21, 3),
+    (10, 73),
     (21, 5),
     (21, 7),
     (21, 9),
@@ -45,14 +51,23 @@ parameterSpaceBinsToExtract = [
     (21, 129),
     (21, 137),
     (21, 145),
-    (21, 149),
-    (21, 151),
-    (21, 152)
+    (27, 73)
 ]
+
+def postDraw(prefixToExtract):
+    if ((re.match("eventInfo_progenitor_", prefixToExtract)) or
+        (re.match("eventInfo_neutralino_", prefixToExtract)) or
+        (re.match("eventInfo_photon_", prefixToExtract))):
+        ROOT.gStyle.SetOptStat(1110)
+        line_object = ROOT.TLine()
+        line_object.SetLineColor(ROOT.kRed)
+        line_object.DrawLine( EB_EE_TRANSITION_ETA, ROOT.gPad.GetUymin(),  EB_EE_TRANSITION_ETA, ROOT.gPad.GetUymax())
+        line_object.DrawLine(-EB_EE_TRANSITION_ETA, ROOT.gPad.GetUymin(), -EB_EE_TRANSITION_ETA, ROOT.gPad.GetUymax())
+        ROOT.gPad.Update()
 
 for prefixToExtract in prefixesToExtract:
     runningCounter = 1
-    for parameterSpaceBinToExtract in reversed(parameterSpaceBinsToExtract):
+    for parameterSpaceBinToExtract in parameterSpaceBinsToExtract:
         extractedHistogram = ROOT.TH1F()
         histogramNameToExtract = "h_{pTE}_eventProgenitorBin_{ePB}_neutralinoBin_{nB}".format(pTE=prefixToExtract, ePB=parameterSpaceBinToExtract[0], nB=parameterSpaceBinToExtract[1])
         print("Fetching histogram: {h}".format(h=histogramNameToExtract))
@@ -60,7 +75,8 @@ for prefixToExtract in prefixesToExtract:
         if (extractedHistogram):
             outputCanvas = ROOT.TCanvas("c_" + histogramNameToExtract, "c_" + histogramNameToExtract)
             extractedHistogram.Draw()
-            outputCanvas.SaveAs("{oF}/{fname}.png".format(oF=outputFolder, fname="{pTE}_{rC:04d}".format(pTE=prefixToExtract, rC=runningCounter)))
+            postDraw(prefixToExtract)
+            outputCanvas.SaveAs("{oF}/{fname}.pdf".format(oF=outputFolder, fname="{pTE}_{rC:04d}".format(pTE=prefixToExtract, rC=runningCounter)))
             runningCounter += 1
         else:
             sys.exit("ERROR: histogram initialized from path {p} is a nullptr.".format(p=histogramNameToExtract))

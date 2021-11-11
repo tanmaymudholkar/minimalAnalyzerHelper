@@ -9,6 +9,11 @@ options.register(name="inputPath",
                  mult=VarParsing.multiplicity.singleton,
 		 mytype=VarParsing.varType.string,
 		 info="Path to file containing list of MINIAOD sources.")
+options.register(name="inputSingleFile",
+                 default="none",
+                 mult=VarParsing.multiplicity.singleton,
+		 mytype=VarParsing.varType.string,
+		 info="Single file to use as source.")
 options.register(name="eventProgenitor",
                  default="event progenitor",
                  mult=VarParsing.multiplicity.singleton,
@@ -25,6 +30,9 @@ options.register(name="verbosity",
 		 mytype=VarParsing.varType.int,
 		 info="Verbosity.")
 options.parseArguments()
+
+if (not(options.inputPath == "none") and not(options.inputSingleFile == "none")):
+    sys.exit("ERROR: options.inputPath and options.inputSingleFile cannot both be \"none\".")
 
 process = cms.Process("GenLevelDeltaRAnalyzer")
 process.load("temp.GenLevelDeltaRAnalyzer.customLogger_cfi")
@@ -46,13 +54,14 @@ process.TFileService = cms.Service("TFileService",
 
 listOfInputFiles = []
 if not(options.inputPath == "none"):
-    inputFileNamesFileObject = open(options.inputPath, 'r')
-    for inputFileName in inputFileNamesFileObject:
-        if (inputFileName[:5] != "file:" ):
-            listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + inputFileName.strip())
-        else:
-            listOfInputFiles.append(inputFileName.strip())
-    inputFileNamesFileObject.close()
+    with open(options.inputPath, 'r') as inputFileNamesFileObject:
+        for inputFileName in inputFileNamesFileObject:
+            if (inputFileName[:5] != "file:" ):
+                listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + inputFileName.strip())
+            else:
+                listOfInputFiles.append(inputFileName.strip())
+elif not(options.inputSingleFile == "none"):
+    listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + options.inputSingleFile)
 
 process.source = cms.Source("PoolSource",
                             fileNames = cms.untracked.vstring(*tuple(listOfInputFiles))
