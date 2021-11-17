@@ -8,3 +8,6 @@ makeDeltaRPlots/makeDeltaRPlots
 *_output.txt
 crab_workArea*
 makeTriggerEfficiencyPlots/makeTriggerEfficiencyPlots
+deltaROutput_*.txt
+eventLists/*
+fileLists*

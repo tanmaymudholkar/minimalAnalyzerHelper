@@ -14,11 +14,23 @@ options.register(name="inputSingleFile",
                  mult=VarParsing.multiplicity.singleton,
 		 mytype=VarParsing.varType.string,
 		 info="Single file to use as source.")
-options.register(name="eventProgenitor",
-                 default="event progenitor",
-                 mult=VarParsing.multiplicity.singleton,
-		 mytype=VarParsing.varType.string,
-		 info="Event progenitor: \"squark\" or \"gluino\".")
+
+options.register ('eventsToProcess',
+                  '',
+                  VarParsing.multiplicity.list,
+                  VarParsing.varType.string,
+                  "Events to process.")
+# options.register(name="selectEventsFromFile",
+#                  default="none",
+#                  mult=VarParsing.multiplicity.singleton,
+# 		 mytype=VarParsing.varType.string,
+# 		 info="Only analyze events with IDs from this file.")
+
+# options.register(name="eventProgenitor",
+#                  default="event progenitor",
+#                  mult=VarParsing.multiplicity.singleton,
+# 		 mytype=VarParsing.varType.string,
+# 		 info="Event progenitor: \"squark\" or \"gluino\".")
 options.register(name="manualOutputPath",
                  default="none",
                  mult=VarParsing.multiplicity.singleton,
@@ -40,10 +52,10 @@ process.load("temp.GenLevelDeltaRAnalyzer.customLogger_cfi")
 process.load("temp.GenLevelDeltaRAnalyzer.genLevelDeltaRAnalyzer_cfi")
 
 process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(options.maxEvents))
-if ((options.eventProgenitor == "squark") or (options.eventProgenitor == "gluino")):
-    process.genLevelDeltaRAnalyzer.eventProgenitor = options.eventProgenitor
-else:
-    sys.exit("ERROR: options.eventProgenitor can be one of \"squark\" or \"gluino\".")
+# if ((options.eventProgenitor == "squark") or (options.eventProgenitor == "gluino")):
+#     process.genLevelDeltaRAnalyzer.eventProgenitor = options.eventProgenitor
+# else:
+#     sys.exit("ERROR: options.eventProgenitor can be one of \"squark\" or \"gluino\".")
 process.genLevelDeltaRAnalyzer.verbosity = options.verbosity
 
 outputPath = "deltaRNtuple.root"
@@ -57,14 +69,33 @@ if not(options.inputPath == "none"):
     with open(options.inputPath, 'r') as inputFileNamesFileObject:
         for inputFileName in inputFileNamesFileObject:
             if (inputFileName[:5] != "file:" ):
-                listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + inputFileName.strip())
+                # listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + inputFileName.strip())
+                listOfInputFiles.append("root://cmsxrootd.fnal.gov/" + inputFileName.strip())
             else:
                 listOfInputFiles.append(inputFileName.strip())
 elif not(options.inputSingleFile == "none"):
-    listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + options.inputSingleFile)
+    # listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + options.inputSingleFile)
+    listOfInputFiles.append("root://cmsxrootd.fnal.gov/" + options.inputSingleFile)
 
 process.source = cms.Source("PoolSource",
                             fileNames = cms.untracked.vstring(*tuple(listOfInputFiles))
 )
+
+# listOfEventsToProcess = []
+# if not(options.selectEventsFromFile == "none"):
+#     with open(options.selectEventsFromFile, 'r') as selected_events_file_handle:
+#         for selected_events_line_raw in selected_events_file_handle:
+#             selected_events_details = (selected_events_line_raw.strip()).split(",")
+#             if not(len(selected_events_details) == 2):
+#                 sys.exit("ERROR: line {l} in unexpected format.".format(l=selected_events_line_raw.strip()))
+#             runID = int(selected_events_details[0])
+#             eventID = int(selected_events_details[1])
+#             print("Adding to list of events to process: {r}, {e}".format(r=runID, e=eventID))
+#             listOfEventsToProcess.append(cms.untracked.EventID(runID, eventID))
+
+# if (len(listOfEventsToProcess) > 0):
+#     process.source.eventsToProcess = cms.untracked.VEventRange(*tuple(listOfEventsToProcess))
+if options.eventsToProcess:
+    process.source.eventsToProcess = cms.untracked.VEventRange(options.eventsToProcess)
 
 process.p = cms.Path(process.genLevelDeltaRAnalyzer)
