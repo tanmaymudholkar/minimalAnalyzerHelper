@@ -41,6 +41,11 @@ options.register(name="verbosity",
 		 mult=VarParsing.multiplicity.singleton,
 		 mytype=VarParsing.varType.int,
 		 info="Verbosity.")
+options.register(name="runParticleTreeDrawer",
+                 default=False,
+		 mult=VarParsing.multiplicity.singleton,
+		 mytype=VarParsing.varType.bool,
+		 info="Run particle tree drawer.")
 options.parseArguments()
 
 if (not(options.inputPath == "none") and not(options.inputSingleFile == "none")):
@@ -98,4 +103,18 @@ process.source = cms.Source("PoolSource",
 if options.eventsToProcess:
     process.source.eventsToProcess = cms.untracked.VEventRange(options.eventsToProcess)
 
-process.p = cms.Path(process.genLevelDeltaRAnalyzer)
+if options.runParticleTreeDrawer:
+    process.load("SimGeneral.HepPDTESSource.pythiapdt_cfi")
+    process.printTree = cms.EDAnalyzer("ParticleTreeDrawer",
+                                       # src = cms.InputTag("prunedGenParticles"),
+                                       src = process.genLevelDeltaRAnalyzer.prunedGenParticlesSrc,
+                                       printP4 = cms.untracked.bool(True),
+                                       printPtEtaPhi = cms.untracked.bool(True),
+                                       printVertex = cms.untracked.bool(True),
+                                       printStatus = cms.untracked.bool(True),
+                                       printIndex = cms.untracked.bool(True)# ,
+                                       # status = cms.untracked.vint32(1)
+    )
+    process.p = cms.Path(process.genLevelDeltaRAnalyzer * process.printTree)
+else:
+    process.p = cms.Path(process.genLevelDeltaRAnalyzer)
