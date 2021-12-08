@@ -46,6 +46,11 @@ options.register(name="runParticleTreeDrawer",
 		 mult=VarParsing.multiplicity.singleton,
 		 mytype=VarParsing.varType.bool,
 		 info="Run particle tree drawer.")
+options.register(name="useFullGenCollection",
+                 default=False,
+		 mult=VarParsing.multiplicity.singleton,
+		 mytype=VarParsing.varType.bool,
+		 info="GenParticles are obtained from the \"genParticles\" collection rather than the \"prunedGenParticles\" collection. For AOD inputs.")
 options.parseArguments()
 
 if (not(options.inputPath == "none") and not(options.inputSingleFile == "none")):
@@ -62,6 +67,9 @@ process.maxEvents = cms.untracked.PSet(input = cms.untracked.int32(options.maxEv
 # else:
 #     sys.exit("ERROR: options.eventProgenitor can be one of \"squark\" or \"gluino\".")
 process.genLevelDeltaRAnalyzer.verbosity = options.verbosity
+
+if options.useFullGenCollection:
+    process.genLevelDeltaRAnalyzer.prunedGenParticlesSrc = cms.InputTag("genParticles")
 
 outputPath = "deltaRNtuple.root"
 if not(options.manualOutputPath == "none"): outputPath = options.manualOutputPath
