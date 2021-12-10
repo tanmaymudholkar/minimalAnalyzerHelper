@@ -20,12 +20,11 @@ options.register ('eventsToProcess',
                   VarParsing.multiplicity.list,
                   VarParsing.varType.string,
                   "Events to process.")
-# options.register(name="selectEventsFromFile",
-#                  default="none",
-#                  mult=VarParsing.multiplicity.singleton,
-# 		 mytype=VarParsing.varType.string,
-# 		 info="Only analyze events with IDs from this file.")
-
+options.register(name="selectEventsFromFile",
+                 default="none",
+                 mult=VarParsing.multiplicity.singleton,
+		 mytype=VarParsing.varType.string,
+		 info="Only analyze events with IDs from this file.")
 # options.register(name="eventProgenitor",
 #                  default="event progenitor",
 #                  mult=VarParsing.multiplicity.singleton,
@@ -94,22 +93,26 @@ process.source = cms.Source("PoolSource",
                             fileNames = cms.untracked.vstring(*tuple(listOfInputFiles))
 )
 
-# listOfEventsToProcess = []
-# if not(options.selectEventsFromFile == "none"):
-#     with open(options.selectEventsFromFile, 'r') as selected_events_file_handle:
-#         for selected_events_line_raw in selected_events_file_handle:
-#             selected_events_details = (selected_events_line_raw.strip()).split(",")
-#             if not(len(selected_events_details) == 2):
-#                 sys.exit("ERROR: line {l} in unexpected format.".format(l=selected_events_line_raw.strip()))
-#             runID = int(selected_events_details[0])
-#             eventID = int(selected_events_details[1])
-#             print("Adding to list of events to process: {r}, {e}".format(r=runID, e=eventID))
-#             listOfEventsToProcess.append(cms.untracked.EventID(runID, eventID))
+listOfEventsToProcess = []
+if not(options.selectEventsFromFile == "none"):
+    process.source.eventsToProcess = cms.untracked.VEventRange( )
+    with open(options.selectEventsFromFile, 'r') as selected_events_file_handle:
+        for selected_events_line_raw in selected_events_file_handle:
+            selected_events_details = (selected_events_line_raw.strip()).split()
+            if not(len(selected_events_details) == 9):
+                sys.exit("ERROR: line {l} in unexpected format.".format(l=selected_events_line_raw.strip()))
+            runID = int(selected_events_details[0])
+            lumiID = int(selected_events_details[1])
+            eventID = int(selected_events_details[2])
+            print("Adding to list of events to process: {r}, {l}, {e}".format(r=runID, l=lumiID, e=eventID))
+            process.source.eventsToProcess.append(cms.untracked.EventRange(runID, lumiID, eventID, runID, lumiID, eventID))
+    process.genLevelDeltaRAnalyzer.selection_map_is_available = True
+    process.genLevelDeltaRAnalyzer.selection_map_source = options.selectEventsFromFile
 
 # if (len(listOfEventsToProcess) > 0):
 #     process.source.eventsToProcess = cms.untracked.VEventRange(*tuple(listOfEventsToProcess))
-if options.eventsToProcess:
-    process.source.eventsToProcess = cms.untracked.VEventRange(options.eventsToProcess)
+# if options.eventsToProcess:
+#     process.source.eventsToProcess = cms.untracked.VEventRange(options.eventsToProcess)
 
 if options.runParticleTreeDrawer:
     process.load("SimGeneral.HepPDTESSource.pythiapdt_cfi")
@@ -126,3 +129,10 @@ if options.runParticleTreeDrawer:
     process.p = cms.Path(process.genLevelDeltaRAnalyzer * process.printTree)
 else:
     process.p = cms.Path(process.genLevelDeltaRAnalyzer)
+
+# cmsRun deltaRAnalyzer_cfg.py inputPath=fileLists/filesList_diphoton17.txt manualOutputPath=deltaR_diphoton17.root selectEventsFromFile=eventLists/events_DiPhotonJets17_signal.txt verbosity=1 > deltaROutput_diphoton17.txt 2>&1
+# cmsRun deltaRAnalyzer_cfg.py inputPath=fileLists/filesList_GJet17.txt manualOutputPath=deltaR_GJet17.root selectEventsFromFile=eventLists/events_GJetHT17_signal.txt verbosity=1 > deltaROutput_GJet17.txt 2>&1
+# cmsRun deltaRAnalyzer_cfg.py inputPath=fileLists/filesList_QCD17.txt manualOutputPath=deltaR_QCD17.root selectEventsFromFile=eventLists/events_HighHTQCD17_signal.txt verbosity=1 > deltaROutput_QCD17.txt 2>&1
+# cmsRun deltaRAnalyzer_cfg.py inputPath=fileLists/filesList_diphoton17_selected.txt manualOutputPath=deltaR_diphoton17_selected.root selectEventsFromFile=eventLists/events_DiPhotonJets17_signal_selected.txt verbosity=4 runParticleTreeDrawer=True > deltaROutput_diphoton17_selected.txt 2>&1
+# cmsRun deltaRAnalyzer_cfg.py inputPath=fileLists/filesList_GJet17_selected.txt manualOutputPath=deltaR_GJet17_selected.root selectEventsFromFile=eventLists/events_GJetHT17_signal_selected.txt verbosity=4 runParticleTreeDrawer=True > deltaROutput_GJet17_selected.txt 2>&1
+# cmsRun deltaRAnalyzer_cfg.py inputPath=fileLists/filesList_QCD17_selected.txt manualOutputPath=deltaR_QCD17_selected.root selectEventsFromFile=eventLists/events_HighHTQCD17_signal_selected.txt verbosity=4 runParticleTreeDrawer=True > deltaROutput_QCD17_selected.txt 2>&1
