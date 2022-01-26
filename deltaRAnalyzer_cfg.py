@@ -109,6 +109,8 @@ if not(options.selectEventsFromFile == "none"):
     process.genLevelDeltaRAnalyzer.selection_map_is_available = True
     process.genLevelDeltaRAnalyzer.selection_map_source = options.selectEventsFromFile
 
+process.SimpleMemoryCheck = cms.Service("SimpleMemoryCheck", ignoreTotal=cms.untracked.int32(1))
+
 # if (len(listOfEventsToProcess) > 0):
 #     process.source.eventsToProcess = cms.untracked.VEventRange(*tuple(listOfEventsToProcess))
 # if options.eventsToProcess:
