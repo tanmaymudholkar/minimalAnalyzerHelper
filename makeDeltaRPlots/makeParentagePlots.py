@@ -30,10 +30,12 @@ output_histograms_parentage = {
     "leading": ROOT.TH1F("parentage_leading", "Parentage of leading reco photon", 4, -0.5, 3.5),
     "subLeading": ROOT.TH1F("parentage_subLeading", "Parentage of subleading reco photon", 4, -0.5, 3.5)
 }
+output_histogram_finalStatePhoton_parentage = ROOT.TH1F("parentage_finalStatePhoton", "Parentage of final state photons", 4, -0.5, 3.5)
 
-for output_label in output_histograms_parentage:
-    for parentage_key in parentage_dictionary:
+for parentage_key in parentage_dictionary:
+    for output_label in output_histograms_parentage:
         output_histograms_parentage[output_label].GetXaxis().SetBinLabel(output_histograms_parentage[output_label].GetXaxis().FindFixBin(parentage_key), parentage_dictionary[parentage_key])
+    output_histogram_finalStatePhoton_parentage.GetXaxis().SetBinLabel(output_histogram_finalStatePhoton_parentage.GetXaxis().FindFixBin(parentage_key), parentage_dictionary[parentage_key])
 
 inputChain = ROOT.TChain("genLevelDeltaRAnalyzer/eventInfoTree")
 inputChain.SetMaxTreeSize(100000000000) # 1 TB
@@ -54,6 +56,9 @@ for eventIndex in range(0, nEntries):
     for output_label in output_histograms_parentage:
         # output_histograms_parentage[output_label].Fill(getattr(inputChain, "parentage_{l}Photon".format(l=output_label)), event_weight)
         output_histograms_parentage[output_label].Fill(getattr(inputChain, "parentage_{l}Photon".format(l=output_label)))
+    if ((inputChain.nTotalFinalStatePhotons) == 2):
+        output_histogram_finalStatePhoton_parentage.Fill((inputChain.parentage_finalStatePhoton)[0])
+        output_histogram_finalStatePhoton_parentage.Fill((inputChain.parentage_finalStatePhoton)[1])
 
 for output_label in output_histograms_parentage:
     output_canvas = ROOT.TCanvas("output_{l}".format(l=output_label), "output_{l}".format(l=output_label), 1200, 1024)
@@ -64,7 +69,16 @@ output_canvas = ROOT.TCanvas("output_n_truth_matched", "output_n_truth_matched",
 output_histogram_nmatches.Draw()
 output_canvas.SaveAs("{o}/n_truth_matched_photons_{s}.pdf".format(o=inputArguments.outputFolder, l=output_label, s=inputArguments.outputSuffix))
 
+output_canvas = ROOT.TCanvas("output_parentage_finalStatePhoton", "output_parentage_finalStatePhoton", 1200, 1024)
+output_histogram_finalStatePhoton_parentage.Draw()
+ROOT.gPad.SetLogy()
+output_canvas.Update()
+output_canvas.SaveAs("{o}/parentage_finalStatePhotons_{s}.pdf".format(o=inputArguments.outputFolder, l=output_label, s=inputArguments.outputSuffix))
+
 print("All Done!")
 # ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_diphoton17.root --outputSuffix "diphoton17"
 # ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_GJet17.root --outputSuffix "GJet17"
 # ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_QCD17.root --outputSuffix "QCD17"
+
+# ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_GJet17_reduced.root --outputSuffix "GJet17_reduced"
+# ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_GJet17_reduced_UL.root --outputSuffix "GJet17_reduced_UL"

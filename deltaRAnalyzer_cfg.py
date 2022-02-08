@@ -52,6 +52,10 @@ options.register(name="useFullGenCollection",
 		 info="GenParticles are obtained from the \"genParticles\" collection rather than the \"prunedGenParticles\" collection. For AOD inputs.")
 options.parseArguments()
 
+REDIRECTOR = "root://cmsdata.phys.cmu.edu/"
+# REDIRECTOR = "root://cmsxrootd.fnal.gov/"
+# REDIRECTOR = "root://cms-xrd-global.cern.ch/"
+
 if (not(options.inputPath == "none") and not(options.inputSingleFile == "none")):
     sys.exit("ERROR: options.inputPath and options.inputSingleFile cannot both be \"none\".")
 
@@ -82,12 +86,12 @@ if not(options.inputPath == "none"):
         for inputFileName in inputFileNamesFileObject:
             if (inputFileName[:5] != "file:" ):
                 # listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + inputFileName.strip())
-                listOfInputFiles.append("root://cmsxrootd.fnal.gov/" + inputFileName.strip())
+                listOfInputFiles.append(REDIRECTOR + inputFileName.strip())
             else:
                 listOfInputFiles.append(inputFileName.strip())
 elif not(options.inputSingleFile == "none"):
     # listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + options.inputSingleFile)
-    listOfInputFiles.append("root://cmsxrootd.fnal.gov/" + options.inputSingleFile)
+    listOfInputFiles.append(REDIRECTOR + options.inputSingleFile)
 
 process.source = cms.Source("PoolSource",
                             fileNames = cms.untracked.vstring(*tuple(listOfInputFiles))
