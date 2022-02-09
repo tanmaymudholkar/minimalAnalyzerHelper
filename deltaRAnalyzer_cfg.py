@@ -9,6 +9,11 @@ options.register(name="inputPath",
                  mult=VarParsing.multiplicity.singleton,
 		 mytype=VarParsing.varType.string,
 		 info="Path to file containing list of MINIAOD sources.")
+options.register(name="inputPathSecondary",
+                 default="none",
+                 mult=VarParsing.multiplicity.singleton,
+		 mytype=VarParsing.varType.string,
+		 info="Path to secondary file containing list of AOD sources.")
 options.register(name="inputSingleFile",
                  default="none",
                  mult=VarParsing.multiplicity.singleton,
@@ -81,6 +86,7 @@ process.TFileService = cms.Service("TFileService",
 )
 
 listOfInputFiles = []
+listOfSecondaryInputFiles = []
 if not(options.inputPath == "none"):
     with open(options.inputPath, 'r') as inputFileNamesFileObject:
         for inputFileName in inputFileNamesFileObject:
@@ -89,6 +95,14 @@ if not(options.inputPath == "none"):
                 listOfInputFiles.append(REDIRECTOR + inputFileName.strip())
             else:
                 listOfInputFiles.append(inputFileName.strip())
+    if not(options.inputPathSecondary == "none"):
+        with open(options.inputPathSecondary, 'r') as inputFileNamesFileObject:
+            for inputFileName in inputFileNamesFileObject:
+                if (inputFileName[:5] != "file:" ):
+                    # listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + inputFileName.strip())
+                    listOfSecondaryInputFiles.append(REDIRECTOR + inputFileName.strip())
+                else:
+                    listOfSecondaryInputFiles.append(inputFileName.strip())
 elif not(options.inputSingleFile == "none"):
     # listOfInputFiles.append("root://cms-xrd-global.cern.ch/" + options.inputSingleFile)
     listOfInputFiles.append(REDIRECTOR + options.inputSingleFile)
@@ -96,6 +110,8 @@ elif not(options.inputSingleFile == "none"):
 process.source = cms.Source("PoolSource",
                             fileNames = cms.untracked.vstring(*tuple(listOfInputFiles))
 )
+if not(options.inputPathSecondary == "none"):
+    process.source.secondaryFileNames = cms.untracked.vstring(*tuple(listOfSecondaryInputFiles))
 
 listOfEventsToProcess = []
 if not(options.selectEventsFromFile == "none"):
