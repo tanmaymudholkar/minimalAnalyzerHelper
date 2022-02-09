@@ -10,6 +10,8 @@ inputArgumentsParser = argparse.ArgumentParser(description='Make MC parentage pl
 inputArgumentsParser.add_argument('--inputPath', required=True, action='append', help='Path to sample.', type=str)
 inputArgumentsParser.add_argument('--outputFolder', default="/uscms/home/tmudholk/nobackup/analysisAreas/MCParentage", help='Output directory in which to store plots.',type=str)
 inputArgumentsParser.add_argument('--outputSuffix', required=True, help='Suffix to append to all plots.',type=str)
+inputArgumentsParser.add_argument('--yMin', default=-1.0, help="Set y-scale minimum manually for final state photon parentage histograms.",type=float)
+inputArgumentsParser.add_argument('--yMax', default=-1.0, help="Set y-scale maximum manually for final state photon parentage histograms.",type=float)
 inputArguments = inputArgumentsParser.parse_args()
 
 import ROOT
@@ -60,6 +62,10 @@ for eventIndex in range(0, nEntries):
         output_histogram_finalStatePhoton_parentage.Fill((inputChain.parentage_finalStatePhoton)[0])
         output_histogram_finalStatePhoton_parentage.Fill((inputChain.parentage_finalStatePhoton)[1])
 
+ROOT.gStyle.SetStatX(0.9)
+ROOT.gStyle.SetStatW(0.2)
+ROOT.gStyle.SetStatY(0.9)
+ROOT.gStyle.SetStatH(0.2)
 for output_label in output_histograms_parentage:
     output_canvas = ROOT.TCanvas("output_{l}".format(l=output_label), "output_{l}".format(l=output_label), 1200, 1024)
     output_histograms_parentage[output_label].Draw()
@@ -72,7 +78,12 @@ output_canvas.SaveAs("{o}/n_truth_matched_photons_{s}.pdf".format(o=inputArgumen
 output_canvas = ROOT.TCanvas("output_parentage_finalStatePhoton", "output_parentage_finalStatePhoton", 1200, 1024)
 output_histogram_finalStatePhoton_parentage.Draw()
 ROOT.gPad.SetLogy()
-output_canvas.Update()
+ROOT.gPad.Update()
+if (inputArguments.yMin > 0):
+    if (inputArguments.yMax < 0.): sys.exit("yMin is set but yMax is not.")
+    if (inputArguments.yMax < inputArguments.yMin): sys.exit("yMax cannot be smaller than yMin.")
+    output_histogram_finalStatePhoton_parentage.GetYaxis().SetRangeUser(inputArguments.yMin, inputArguments.yMax)
+    ROOT.gPad.Update()
 output_canvas.SaveAs("{o}/parentage_finalStatePhotons_{s}.pdf".format(o=inputArguments.outputFolder, l=output_label, s=inputArguments.outputSuffix))
 
 print("All Done!")
@@ -82,3 +93,6 @@ print("All Done!")
 
 # ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_GJet17_reduced.root --outputSuffix "GJet17_reduced"
 # ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_GJet17_reduced_UL.root --outputSuffix "GJet17_reduced_UL"
+
+# ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_GJet17_UL_single_with_full.root --outputSuffix "GJet17_UL_HT600_inf_full"
+# ./makeDeltaRPlots/makeParentagePlots.py --inputPath deltaR_GJet17_UL_single_with_reduced.root --outputSuffix "GJet17_UL_HT600_inf_reduced"
